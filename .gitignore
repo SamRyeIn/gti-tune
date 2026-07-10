@@ -1,0 +1,22 @@
+# Independent nested repo (simoscal library — github.com/SamRyeIn/simoscal)
+Code/
+
+# Third-party / reference-only material (large, not ours)
+BinToolz-main/
+References/
+
+# Generated tune-run outputs — deterministic re-runs of the revision scripts;
+# the scripts + REV_LOG.md are the record
+*_out/
+
+# ECU binaries (VW firmware-derived; regenerable from scripts + stock bin)
+*.bin
+
+# Python bytecode
+__pycache__/
+
+# OS / editor / app noise
+.DS_Store
+~$*
+.obsidian/workspace*
+.claude/settings.local.json
