@@ -75,20 +75,65 @@ against the switch-patch XDF (slot tables decode plausibly).
 
 ## Open questions before implementing
 
-1. **Checksum coverage outside CAL** — the patch touches ASW/code regions with
-   their own block checksums; establish whether the `.btp`'s stored modified
-   bytes already include corrected block checksums, and what SimosTools
-   requires at full-flash time.
-2. **Which XDF** for a patched bin — curated `v1.005`/`v1.006` vs BinToolz's
-   `S50 Switch Patch.29.33.V2.xdf`; validate against the actually-patched bin.
+Questions 1–2 were **resolved offline** during the BTP-adapter U1 investigation
+(2026-07-10) against a copy of the stock bin; see the "U1 findings" section below.
+Questions 3–4 remain future work (on-car / flash procedure).
+
 3. **Switching procedure** — how slots are selected/configured in practice
    (cruise-stalk actuation, slot defaults); possibly covered by the not-yet-
    ingested `Docs/4. ECU Tuning - Not the Basics.docx`.
 4. A switch-patched bin **requires a full flash** (not CAL-only) per
    [[ecu-tuning-basics]] — plan the flash procedure accordingly.
 
-All investigation (items 1–2) is safe offline against bin copies. Note: per
-`Troubleshooting/CheckEngine/20260710_Troubleshooting.txt`, tuning is paused
-until the DSG electrical faults are diagnosed — this is future work.
+Note: per `Troubleshooting/CheckEngine/20260710_Troubleshooting.txt`, tuning is
+paused until the DSG electrical faults are diagnosed — flashing is future work.
+
+## U1 findings (2026-07-10) — offline, on a stock-bin copy
+
+Applying `SL PATCH.29.33 - S50.btp` (softCode `SC800S50`, fileSize 4194304, **38
+blocks**) to a copy of `5G0906259L__0002.bin` (BinToolz hardware `Simos 18.1`,
+CAL = block 4 at `0x200000`, len `0x7fc00`):
+
+- **10130 bytes change**, 4098 in CAL (block 4), the rest across ASW/code
+  blocks 1–3. All changed bytes fall **inside the patch's declared (offset,
+  length) blocks** — 0 outside. `changeBin` offsets are bin positions, so
+  declared blocks map directly onto a full-bin diff. Gap-fill means declared
+  blocks total 11436 bytes but only 10130 actually differ — the confined-diff
+  invariant is one-directional (changes ⊆ declared, not the reverse).
+- **Round-trip proven**: apply then remove yields a **byte-identical** bin.
+
+**Q1 — checksum coverage (answer).** The `.btp`'s stored modified bytes do **not**
+carry corrected checksums:
+
+- **`CAL_CRC` goes STALE on apply** (stock `0x38521ef3` → recomputed
+  `0x164a251f`). It must be corrected before flash — `simoscal`'s
+  `save(..., correct_checksums=True)` / `checksum.correct` recomputes it, or the
+  flasher does. A patched bin is therefore **not internally self-consistent as
+  stored**.
+- **`ECM3` stays VALID** — the patch does not touch the CAL areas ECM3 sums.
+- **ASW/code block checksums (blocks 1–3)** are **outside `simoscal`'s checksum
+  scope** (it only implements `CAL_CRC` + `ECM3`). They are computed by
+  SimosTools/VW_Flash at full-flash time. The AE5 report states them as
+  **not-verifiable**, never assumes clean.
+
+**Q2 — which XDF (answer).** The authoritative XDF that **loads under `simoscal`**
+is BinToolz's own **`BinToolz-main/definitions/S50 Switch Patch.29.33.V2.xdf`**
+(185 tables; 123 Map Slot 1–5 / Map Switching tables resolve and **all decode
+without codec error**). The curated `xdf/SC8S50_switchpatch29.33_v1.005/.006.xdf`
+**do not load** — they reuse a single `uniqueid` across the 5 slots (different
+address per slot), which `simoscal`'s uniqueid→single-location model rejects
+(`uniqueid 0x11f9c reused with DIFFERENT data`). BinToolz's XDF instead gives each
+slot a distinct `uniqueid` (e.g. RPM-limiter slots `0x7cb40`/`0x7cb42`/… for slots
+1–5). Loading these XDFs also required a `simoscal` parser fix: a non-z axis whose
+`<EMBEDDEDDATA>` lacks `mmedaddress` is a TunerPro **label/static axis**
+(`mmedmajorstridebits="-32"`, breakpoints from `<LABEL>`s) — the switch-patch XDFs
+use 854+ of these; the parser now treats them as label axes instead of erroring.
+
+Patched-vs-stock is clearly distinguishable (guards AE6 against a false pass on an
+unpatched bin): stock reads the slot regions as uninitialized (PUT-setpoint slots
+`0.0`, "PUT SP RPM Axis" `0.0`), the patched bin reads plausible values
+(PUT-setpoint slots ≈ 4000 hPa; "PUT SP RPM Axis" `0x7d7dc` decodes to a
+monotonic rpm breakpoint set `[2000, 2500, 3000, …]`). 17 slot/switch tables
+differ from stock.
 
 Related: [[sc8s50-switchpatch-xdf]], [[ecu-tuning-basics]], [[tuning-getting-started]]

@@ -65,6 +65,27 @@ Features introduced by the patch, beyond stock calibration:
 
 - This is the XDF to use when tuning a **switch-patched** BIN with selectable maps; the curated category layout makes it the more ergonomic day-to-day definition.
 - Because it's switch-patched, edits land across the map slots — understand which slot a table belongs to before editing.
-- For the Python library, this is a valid load target but **not** the Phase 1 working default (that's `SC8S50.V1.0.xdf`); useful later as a second fixture to confirm the parser handles the 1.80 format and the extra categories.
+- For the Python library, **this curated XDF does not currently load** (see below); the BinToolz definition is the one to use against a switch-patched bin.
 
-Related: [[ecu-tuning-basics]], [[tuning-getting-started]], [[xdf-bin-library-requirements]]
+## Which XDF loads under `simoscal` (BTP-adapter U1, 2026-07-10)
+
+Resolved offline while building the BTP patching adapter (see
+[[bintoolz-btp-patching]] "U1 findings"): the authoritative XDF for a
+switch-patched bin, and the one that **loads under `simoscal`**, is BinToolz's own
+**`BinToolz-main/definitions/S50 Switch Patch.29.33.V2.xdf`** — 185 tables, all 123
+Map Slot 1–5 / Map Switching tables resolve and decode without codec error.
+
+The curated `v1.005`/`v1.006` here **fail to load**: they map all five slots of a
+table onto a **single reused `uniqueid`** at different addresses
+(`uniqueid 0x11f9c reused with DIFFERENT data`), which `simoscal`'s
+uniqueid→single-location model rejects. BinToolz's XDF gives each slot a distinct
+`uniqueid` (e.g. RPM-limiter slots `0x7cb40`/`0x7cb42`/…), so it maps cleanly.
+
+Loading these 1.80 XDFs also required a small parser fix in `simoscal/xdf.py`: a
+non-z `XDFAXIS` whose `<EMBEDDEDDATA>` has no `mmedaddress` is a TunerPro
+**label/static axis** (breakpoints from `<LABEL>`s, flagged
+`mmedmajorstridebits="-32"`); the parser now treats it as a label axis rather than
+raising. The default `SC8S50.V1.0.xdf` has none of these, so that fix is
+behavior-preserving there.
+
+Related: [[bintoolz-btp-patching]], [[ecu-tuning-basics]], [[tuning-getting-started]], [[xdf-bin-library-requirements]]
