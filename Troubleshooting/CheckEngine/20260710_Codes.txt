@@ -1,0 +1,10 @@
+Get DTC
+-ECU-
+DTC: P0036 02 Sensor Heater Contr. Circ.(Bank1 (1)Sensor 2)
+(SV_ERR_SYM_LSH_LS_OC_1.20638)
+DTC: 1 found.
+-DSG
+DTC: P072C Stuck in Gear 1 (DTC_21153) DTC: P072B Stuck in Reverse (DTC_21159)
+DTC: P174A Valve 3 in partial transmission 1 Electrical error (DTC_10731) DTC: P174E Valve 3 in partial transmission 2 Electrical error (DTC_10732) DTC: P0726 Engine Speed Inp.Circ. Range/Performance (DTC_10657) DTC: P179D Cooling oil valve Electrical error (DTC_10906)
+DTC: P1734 Starter release from the selector lever sensor system (DTC 10763)
+DTC: 7 found.

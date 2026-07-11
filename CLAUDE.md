@@ -22,19 +22,20 @@ Boot reading order for a fresh session, before doing tuning work:
 Two kinds of folders: **human drop zones** (Sam puts files there; Claude reads
 them) and **Claude-maintained** (Claude writes/updates; human reviews).
 
-| Folder           | Role                          | Contents                                                         |
-|------------------|-------------------------------|------------------------------------------------------------------|
-| `Code/`          | Claude-maintained             | The `simoscal` library (its own git repo) — see notes below      |
-| `Code/bin/`      | Human drop zone               | Known-good stock bin `5G0906259L__0002.bin` — the recovery image |
-| `Code/xdf/`      | Human drop zone               | TunerPro XDF definitions; primary is `SC8S50.V1.0.xdf`           |
-| `Tunes/`         | Claude-maintained             | Tune projects: revision scripts, `REV_LOG.md`, run outputs       |
-| `Logs/`          | Human drop → Claude-analyzed  | SimosTools datalog CSVs per flashed revision + `log_review.md`   |
-| `PIDs/`          | Human drop zone               | SimosTools logging-list CSVs (PID definitions) + PID List Editor |
-| `Docs/`          | Mixed                         | Human: source `.docx` guides; Claude: `plans/`, `brainstorms/`   |
-| `knowledge/`     | Claude-maintained             | The wiki: ingested reference notes + `media/<note>/` screenshots |
-| `References/`    | Human drop zone               | External material: Funktionsrahmen PDF, Cobb links, example logs |
-| `BinToolz-main/` | Vendored third-party          | BinToolz tool + `.btp` patches — reference only, do not edit     |
-| `index.md`       | Claude-maintained             | Obsidian wiki home page (`.obsidian/` is the vault config)       |
+| Folder             | Role                            | Contents                                                           |
+|--------------------|---------------------------------|--------------------------------------------------------------------|
+| `Code/`            | Claude-maintained               | The `simoscal` library (its own git repo) — see notes below        |
+| `Code/bin/`        | Human drop zone                 | Known-good stock bin `5G0906259L__0002.bin` — the recovery image   |
+| `Code/xdf/`        | Human drop zone                 | TunerPro XDF definitions; primary is `SC8S50.V1.0.xdf`             |
+| `Tunes/`           | Claude-maintained               | Tune projects: revision scripts, `REV_LOG.md`, run outputs         |
+| `Logs/`            | Human drop → Claude-analyzed    | SimosTools datalog CSVs per flashed revision + `log_review.md`     |
+| `PIDs/`            | Human drop zone                 | SimosTools logging-list CSVs (PID definitions) + PID List Editor   |
+| `Troubleshooting/` | Human drop → Claude-analyzed    | Check-engine / fault info Sam drops in (codes, notes) by topic     |
+| `Docs/`            | Mixed                           | Human: source `.docx` guides; Claude: `plans/`, `brainstorms/`     |
+| `knowledge/`       | Claude-maintained               | The wiki: ingested reference notes + `media/<note>/` screenshots   |
+| `References/`      | Human drop zone                 | External material: Funktionsrahmen PDF, Cobb links, example logs   |
+| `BinToolz-main/`   | Vendored third-party            | BinToolz tool + `.btp` patches — reference only, do not edit       |
+| `index.md`         | Claude-maintained               | Obsidian wiki home page (`.obsidian/` is the vault config)         |
 
 Notes:
 

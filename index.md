@@ -11,6 +11,8 @@ Stable reference and how-to material, ingested from `Docs/` (text via pandoc; em
 - [[ecu-tuning-basics]] 🖼️ *77 figures · 6 transcribed HINT tables (double-entry verified)* — TunerPro tuning SOP: torque request model, TTA/ATT airflow-torque tables, boost control, wastegate flow-factor tuning, timing, lambda/fueling, ethanol, limiter removal, DSG farts, pops & bangs.
 - [[sc8s50-switchpatch-xdf]] — Reference note on the curated switch-patch XDF (`SC8S50_switchpatch29.33_v1.005.xdf`): TunerPro 1.80 structure, on-the-fly map switching (5 slots), and patch-added features (Launch Control, TC, NLS).
 - [[eqt-s2-baseline-log-review]] — Baseline analysis of the **currently-installed EQT Stage 2 91** tune from a clean WOT 3rd-gear street datalog: peak 28 psi / 409 ft-lb on the IS20, confirmed underdamped boost overshoot, zero knock on 92 octane. Fault-free reference point for a more conservative DIY rewrite.
+- [[bintoolz-btp-patching]] — BinToolz `.btp` code review: the format stores original+modified bytes with byte-exact pre-verification; safety procedures and gaps; license blocks porting → **wrap, don't port** decision for future multi-slot (switch patch) work, with open questions.
+- [[subagent-boot-test]] — 2026-07-10 experiment: four fresh subagents (Sonnet/Opus × quick/thorough) given a bare "add base timing" prompt to test whether the boot docs transfer project knowledge. All four found the right tables and protected the R04 knock cells; conclusions on why (rationale-style REV_LOGs) and process lessons.
 - [[eqt-s2-track-log-p2563]] — On-track Pacific Raceways session on the same tune: catches the **[[P2563]] mechanism live** — actuator pinned at 100% while boost stays 2–3 psi under target for ~40 s cumulative. Shows the root cause is a turbo/exhaust-heat target-vs-capability gap (not IAT/intercooler), plus a mild cyl-1 knock event and oil/EGT thermal limits.
 
 ## Projects
@@ -38,6 +40,7 @@ Full folder-by-folder map (with human-drop-zone vs Claude-maintained roles) in `
 - `Tunes/` — tune projects: revisioned `TUNE_*_R<rev>.py` scripts, `REV_LOG.md`, timestamped run outputs.
 - `Logs/` — SimosTools datalogs, one folder per flashed revision, each with a `log_review.md`.
 - `PIDs/` — SimosTools logging-list CSVs (PID definitions) + PID List Editor.
+- `Troubleshooting/` — human-dropped check-engine / fault material (codes, notes), one subfolder per topic (e.g. `CheckEngine/`); Claude analyzes what lands here.
 - `Docs/` — original source documents (`.docx`), plus `plans/` and `brainstorms/`.
 - `knowledge/` — ingested reference notes (this wiki).
 - `knowledge/media/<note>/` — screenshots extracted from the source `.docx` files, one folder per note, referenced inline by that note.

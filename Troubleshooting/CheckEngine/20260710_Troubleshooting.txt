@@ -1,0 +1,123 @@
+2017 VW GTI DSG - 2026-07-10 Check-Engine / DSG Scan Troubleshooting
+=====================================================================
+
+Source scan: 20260710_Codes.txt
+
+IMPORTANT
+---------
+Do not perform further WOT pulls or ECU/TCU calibration validation until the
+DSG fault state is characterized. If PRNDS flashes, drive/reverse cannot be
+selected reliably, or the DSG enters limp mode, do not drive the car except as
+needed to park it safely or load it for transport.
+
+Recorded DTCs
+-------------
+ECU
+  P0036 - Bank 1 Sensor 2 oxygen-sensor heater control-circuit fault.
+
+DSG
+  P072C - Stuck in gear 1.
+  P072B - Stuck in reverse.
+  P174A - Valve 3 in transmission section 1 electrical fault.
+  P174E - Valve 3 in transmission section 2 electrical fault.
+  P0726 - Engine-speed input circuit range/performance.
+  P179D - Transmission-oil cooling-valve electrical fault.
+  P1734 - Selector-lever sensor-system starter-release fault.
+
+Assessment
+----------
+The DSG faults are the priority. P072C and P072B are consequences of the
+faulted DSG system, not the first repair target. P174A, P174E, and P179D are
+explicit electrical faults across multiple DSG actuator circuits. This pattern
+most strongly indicates a shared electrical cause:
+
+  1. Low-voltage event, weak battery, charging-system fault, or poor power/
+     ground connection.
+  2. DSG mechatronic external connector or harness damage, corrosion, fluid
+     ingress, or loose connection.
+  3. Internal mechatronic circuit-board, solenoid, or control-module failure.
+
+The Cobb DSG tune is not the leading explanation. A TCU calibration can affect
+shift behavior, torque limits, and clutch-pressure behavior, but should not
+create electrical-circuit faults in multiple valve circuits. Do not reflash the
+TCU as the first diagnostic action. Do not flash either ECU or TCU while system
+voltage is questionable.
+
+The ECU and DSG faults are treated as independent until evidence shows
+otherwise. None of the documented SimosTools ECU calibration changes plausibly
+causes a DSG valve electrical fault.
+
+P0036 Assessment
+----------------
+P0036 is the heater circuit for the rear/post-catalyst oxygen sensor, Bank 1
+Sensor 2. A performance-oriented catalytic converter can cause a catalyst
+efficiency DTC (commonly P0420), but does not normally cause a heater-circuit
+DTC by itself.
+
+The car previously had an O2 sensor unplugged while Cobb tuned. If that was the
+rear/post-catalyst sensor, reconnecting it is the most likely direct resolution
+for P0036. The sensor, connector, any extension harness, and wiring near the
+downpipe must still be inspected for exhaust heat damage, stretching, pinching,
+or corrosion. Do not suppress P0036 in the ECU calibration.
+
+Recommended Diagnostic Sequence
+-------------------------------
+1. Preserve evidence before clearing anything.
+   - Obtain a full VCDS or OBDeleven Auto-Scan.
+   - Save DSG controller identification, all DTC status bits, fault frequency,
+     mileage/time stamps, and freeze-frame or environmental data.
+   - The source scan identifies the codes but not whether faults are static,
+     intermittent, or associated with low voltage.
+
+2. Check electrical-system health.
+   - Test the battery and record resting voltage after the vehicle has sat.
+   - Record charging voltage with the engine running.
+   - Inspect battery terminals, main fuses, battery ground, and engine/
+     transmission ground straps.
+
+3. Inspect the DSG electrical path with the vehicle safely off and using the
+   factory procedure.
+   - Inspect the external mechatronic/DSG connector and harness.
+   - Look for a loose connector lock, damaged pins, corrosion, fluid ingress,
+     chafing, or rodent damage.
+   - Do not jumper or power DSG solenoids without the vehicle-specific wiring
+     diagram and the appropriate guided-test procedure.
+
+4. Address the rear O2-sensor connection.
+   - With the exhaust cold, identify and fully reconnect Bank 1 Sensor 2.
+   - Inspect the connector and downstream-sensor wiring/extension.
+   - Preserve the scan, clear the ECU DTC, key-cycle, and rescan.
+   - Complete a normal cold start and short non-WOT drive, then scan again.
+   - P0036 returning immediately or after the cold start points to the sensor
+     heater, connector/extension, wiring, fuse/feed, or ground.
+   - P0036 remaining absent after reconnection requires no ECU calibration
+     change. A later P0420 would be a separate catalyst-efficiency issue.
+
+5. After preserving the full scan and completing basic voltage/connector checks,
+   clear the DSG faults and key-cycle without driving.
+   - DSG electrical faults returning immediately as static favor the connector,
+     harness, or internal mechatronic electrical path.
+   - Faults returning only with a voltage, heat, vibration, or drive-cycle event
+     require controlled diagnosis with live DSG supply voltage and fault status.
+   - Do not use WOT testing to reproduce DSG faults.
+
+Web Research Notes
+------------------
+Web results corroborate that P174A and P174E identify electrical faults in
+Valve 3 for the two DSG transmission sections. A DQ250 case containing the
+same core electrical combination (P0726, P174A, P174E, and P179D) was located.
+This supports investigation of the mechatronic electrical path, but is not
+evidence to replace a mechatronic unit before testing.
+
+Sources consulted on 2026-07-10:
+  https://eco-torque.co.uk/blogs/news/vw-audi-02e-dq250-dsg-mechatronic-failures-symptoms-fault-codes-fixes
+  https://www.ecuconnections.com/forum/viewtopic.php?t=76431
+  https://www.engine-codes.com/p174a_volkswagen.html
+  https://www.engine-codes.com/p174e_volkswagen.html
+
+Current Decision
+----------------
+Pause tuning and high-load operation. First reconnect and verify the rear O2
+sensor path for P0036, then obtain the detailed DSG scan and diagnose the
+shared electrical path before considering any DSG hardware replacement or TCU
+reflash.
