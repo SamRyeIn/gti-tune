@@ -78,10 +78,16 @@ Tuning is iterative, and each pass through the loop looks like this:
    Android app. Claude cannot do this.
 4. **Log** — human step. Sam drives (e.g. 3rd-gear WOT pulls), logs with
    SimosTools, and drops the CSVs into a new `Logs/<Tune>_R<NN>/` folder.
-5. **Review** — Claude analyzes the logs: writes `log_review.md` in that folder
-   (findings ranked High/Medium/Low with evidence plots from a `plot_log_review.py`
-   script), checking knock, boost tracking, lambda, fuel pressure, turbo/temps.
-   Check the gear-indexing rule below and the PID list before interpreting channels.
+5. **Review** — Claude analyzes the logs. First run the analysis battery
+   (`python -m simoscal.analysis Logs/<Tune>_R<NN>` or `analyze_folder()`), which
+   writes `analysis_findings.{json,md}`, evidence plots, and per-table coverage
+   maps into the folder — an identical, enumerable, deterministic set of checks
+   with an explicit SKIPPED list. Then Claude reads that output and **writes
+   `log_review.md`** (findings ranked High/Medium/Low with evidence plots),
+   checking knock, boost tracking, lambda, fuel pressure, turbo/temps. The tool
+   is findings-only — it never writes `log_review.md` and never proposes a
+   calibration change; authorship and judgment stay with Claude. Check the
+   gear-indexing rule below and the PID list before interpreting channels.
 6. Findings feed the next revision → back to step 1.
 
 Every tune revision is "a starting point, not a finished calibration" — never

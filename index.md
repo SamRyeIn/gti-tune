@@ -38,7 +38,7 @@ Full folder-by-folder map (with human-drop-zone vs Claude-maintained roles) in `
 
 - `Code/` — the `simoscal` Python library (its own git repo). Includes `Code/bin/` (stock ECU binary — the recovery image) and `Code/xdf/` (TunerPro definition files; **must match the BIN's file structure, SC8S50**).
 - `Tunes/` — tune projects: revisioned `TUNE_*_R<rev>.py` scripts, `REV_LOG.md`, timestamped run outputs.
-- `Logs/` — SimosTools datalogs, one folder per flashed revision, each with a `log_review.md`.
+- `Logs/` — SimosTools datalogs, one folder per flashed revision, each with a `log_review.md`. The `simoscal.analysis` battery (`python -m simoscal.analysis Logs/<Tune>_R<NN>`) writes a read-only, findings-only `analysis_findings.{json,md}` + evidence plots + coverage maps into the folder that Claude reads to author `log_review.md` — see `Code/README.md` § Log analysis battery.
 - `PIDs/` — SimosTools logging-list CSVs (PID definitions) + PID List Editor.
 - `Troubleshooting/` — human-dropped check-engine / fault material (codes, notes), one subfolder per topic (e.g. `CheckEngine/`); Claude analyzes what lands here.
 - `Docs/` — original source documents (`.docx`), plus `plans/` and `brainstorms/`.
