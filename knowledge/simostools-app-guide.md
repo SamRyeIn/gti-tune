@@ -86,7 +86,10 @@ Review logs on-device without a computer — an overlaid multi-trace chart with 
 The Flashing screen streams per-block progress (erasing → transferring → checksum, then verify → reset ECU → clear DTC) and ends with *"turn key to off for at least 5 seconds before starting vehicle."*
 - **Flash Full** — first flash must be a full BIN flash (up to ~7 min). Battery on a charger. Select **unlock** on first flash.
 - **Flash CAL** — subsequent changes (e.g. boost/timing tweaks) only need a CAL flash (<1 min, overwrites Block 5 only).
-- **Any bin patch (MPI, SWG, etc.) requires a full flash.**
+- **Project clarification for patched tune updates** — use a full flash to
+  install, remove, or change a patch/code component. Once the ECU already has
+  the same verified patch set, subsequent calibration/tune changes may use
+  **Flash CAL**; CAL-only must not be used to introduce or upgrade a patch.
 
 ![Flashing screen — Block 4/5 erase/transfer/checksum complete, verify/reset/clear-DTC, with Flash CAL / Flash Full / Tune Info / Back buttons](media/simostools-app-guide/12-flashing.png)
 

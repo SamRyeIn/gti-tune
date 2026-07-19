@@ -26,6 +26,7 @@ Active, time-bound work.
 | | |
 |---|---|
 | Vehicle | 2017 VW GTI |
+| Transmission | DQ250 DSG (dual-clutch |)
 | Box code | `5G0906259L_0002` |
 | ECU | Simos 18.1 / 18.6 |
 | File structure | SC8S50 ("S50") |

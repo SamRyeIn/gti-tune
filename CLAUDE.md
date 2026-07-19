@@ -16,6 +16,9 @@ Boot reading order for a fresh session, before doing tuning work:
 3. `Code/README.md` — the `simoscal` API, workflow diagram, safety model.
 4. The active tune's `REV_LOG.md` (e.g. `Tunes/TuningBasicsGuide/REV_LOG.md`)
    and the latest `Logs/<Tune>_R<rev>/log_review.md` — current tune state.
+5. The active tune's `README_NEXT_STEPS.md` (e.g.
+   `Tunes/TuningBasicsGuide/README_NEXT_STEPS.md`) — the pre-work idea queue for
+   upcoming revisions (what to change next, before it's scripted).
 
 ## Folder structure
 
@@ -52,7 +55,8 @@ Notes:
   stock bin, `xdf/` definitions, `oracles/` captured TunerPro exports (test
   fixtures). XDFs must match the bin's SC8S50 file structure.
 - A `Tunes/<Tune>/` project holds revisioned `TUNE_<Tune>_R<rev>.py` scripts,
-  `REV_LOG.md`, and `<Tune>_out/R<rev>_<timestamp>/` run outputs (saved bin,
+  `REV_LOG.md`, a `README_NEXT_STEPS.md` (living pre-work idea queue for upcoming
+  revisions), and `<Tune>_out/R<rev>_<timestamp>/` run outputs (saved bin,
   `report.md`, `compare/` PNGs). `Tunes/TuningBasicsGuide/Test/` holds
   other-model comparison runs — reference only, not part of the lineage.
 - A `Logs/<Tune>_R<rev>/` folder holds the raw `simostools-*.csv` logs Sam

@@ -84,6 +84,27 @@ Move out of the way (flatten so it doesn't cap the curve). **Default unless told
 otherwise: 1.70 at 1000 RPM, flat 2.80 from ~2000 up to 7000 RPM:**
 * `IP_PQ_CHA_MAX`  — Maximum allowed pressure quotient at turbo charger compressor (8×8) (Turbo Max Pressure Ratio table)
 
+> **Editing rule (2026-07-12, per Sam):** whenever this table is updated, **keep
+> the 1.70 at the 1000 RPM column and change only the higher-RPM cells**. The
+> 1000 RPM cell is the surge-corner protection (high PR demand at low compressor
+> flow); it is never in the way of the boost curve, so there is no reason to
+> raise it. Verified on the 259L bin: X axis `ldp_n_ip_cha_max` (0x197e8) =
+> 1000 / 2000 / 3000 / 4000 / 5000 / 6000 / 6500 / 7000 rpm, Y axis
+> `ldp_tia_cha_up_ip_pq_cha_max` (0x31b0) = charge-air upstream temp −20.25 to
+> +50.25 °C, z-data 0x1ab9a (uint16, scale 1/4096). Stock 259L ships flat 9.30
+> (non-binding). Known deviation: `Code/simoscal/sop_recipe.py` ("Boost — Max PR
+> flatten (Option 2)") broadcasts a flat 2.80 over all 64 cells, missing the
+> 1.70 @ 1000 RPM part of the default — R06–R09 bins therefore carry 2.80 in the
+> 1000 RPM column; R10 restored the correct shape (1.70 / 3.1). If the recipe is
+> ever fixed, note that re-running the R06–R09 scripts would then produce bins
+> that differ from the ones actually flashed.
+>
+> In-car behavior (R09 logs, `Logs/BasicsGuide_R09/log_review.md`): operation at
+> this cap raises **`Torque Lim ()` code 128**, and the ECU computes the quotient
+> against **measured pre-compressor pressure** (`PRS_CHA_UP`, ambient minus
+> intake depression ~3–6 kPa at high flow), not raw ambient — size the cap with
+> that margin in mind.
+
 Supporting toggle (guide sets to 1 so PUT is derived from PR × ambient pressure;
 stock = 0):
 * `LC_PUT_SP_TOL_ENA_AMP`  — Use AMP for calculation of PUT out of pressure ratio (instead of PRS_CHA_UP)
@@ -327,7 +348,7 @@ Keep TTA and ATT **consistent** — a corresponding TTA and ATT table should rep
 
 ![PUT setpoint table used directly to shape the boost curve (Option 2, preferred) — axis set to 2698 hPa](media/ecu-tuning-basics/22b-put-setpoint-boost-curve-hint.png)
 
-> **Starting values** *(guide example bin — verify before flashing; cross-checked)*. PUT setpoint in hPa (÷10 for kPa PUT). Only the **last row (2698.97)** shapes the boost curve; the three rows above are left near-stock. The paired Max PR table is flattened to **2.80** (moved out of the way for Option 2).
+> **Starting values** *(guide example bin — verify before flashing; cross-checked)*. PUT setpoint in hPa (÷10 for kPa PUT). Only the **last row (2698.97)** shapes the boost curve; the three rows above are left near-stock. The paired Max PR table is moved out of the way for Option 2: **1.70 at the 1000 RPM column, flat 2.80 from ~2000 up** — see the editing rule under the `IP_PQ_CHA_MAX` bullet above (keep the 1.70 @ 1000 RPM cell whenever raising the plateau).
 >
 > | Y \ RPM     | 2000        | 3000        | 4000        | 5000        | 5750        | 6500        |
 > |-------------|-------------|-------------|-------------|-------------|-------------|-------------|

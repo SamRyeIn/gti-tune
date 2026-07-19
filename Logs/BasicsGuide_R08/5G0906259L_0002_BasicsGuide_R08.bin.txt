@@ -1,0 +1,2 @@
+Flashed bin: 5G0906259L_0002_BasicsGuide_R08.bin (FULL flash).
+Source run: Tunes/TuningBasicsGuide/TUNE_Basics_Guide_out/R08_20260712-170312/
