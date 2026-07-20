@@ -30,6 +30,8 @@ the final review remain human-only steps.
 | R10      | `TUNE_Basics_Guide_R10.py` | R09 + reshape IP_PQ_CHA_MAX (max compressor pressure ratio): 1.70 @ 1000 rpm, flat 3.1 @ 2000-7000 rpm, to clear the code-128 cap trimming the shelf. CAL-flash eligible after the R07 patch set is installed.                                                     |
 | R11      | `TUNE_Basics_Guide_R11.py` | R10 + park `IP_PUT_SP` — Pressure up throttle setpoint at 30 psi gauge-equivalent full-load ceiling; all five switch-patch `PUT setpoint` grids become explicit lower caps on a shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed. |
 | R12      | `TUNE_Basics_Guide_R12.py` | R11 + repurpose slot 5 as a valet map: its patch `PUT setpoint` grid is a flat 1705 hPa absolute cap (9.993 psi gauge) across the shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed.                                               |
+| R13      | `TUNE_Basics_Guide_R13.py` | No calibration change. Re-declares the complete R00–R12 calibration in the `simoscal.tune` API as one flat script (zero imports from other revisions); output bin byte-identical to R12. Do not flash.                                                             |
+| R14      | `TUNE_Basics_Guide_R14.py` | R13 calibration + add a stock map (slot 1, factory `IP_PUT_SP` boost target ~21.6 psi read live from the stock bin) and reorder the drivable slots least→most (1 stock, 2 conservative, 3 intermediate, 4 aggressive); slot 5 valet unchanged. Only the four per-slot `PUT setpoint` grids move. CAL-flash eligible after the R07 patch set is installed. |
 
 ## R00 — Initial revision
 
@@ -916,3 +918,63 @@ it would be a no-op at best. The next revision to flash is R14, which will be
 the first to use this authoring path for an actual calibration change — and it
 inherits the same rule as every revision before it: a starting point, not a
 finished calibration, reviewed by a human before it reaches the car.
+
+## R14 — add a stock map and order the slots least→most aggressive
+
+**First calibration change written in the `simoscal.tune` API** (R13 was a
+byte-identical re-declaration). R14 changes **only the switch-patch slot
+assignments** — the shared base calibration (knock retard, lambda enrichment,
+wastegate feedforward, limiters, P0234 threshold) is byte-identical to R13/R12.
+
+### Why
+
+The five slots had grown up ad hoc: slot 3 was the aggressive shelf, slot 1 and
+slot 4 were the *same* conservative curve (a wasted duplicate), and there was no
+low-boost map for daily / pump-gas / handing-the-keys-over driving. R14 gives
+the slots a deliberate least→most ladder and spends the freed duplicate on a
+stock map.
+
+| R13 slot             | R14 slot                | Full-load peak |
+| -------------------- | ----------------------- | -------------- |
+| 1 conservative       | 1 **stock** (new)       | ~21.6 psi      |
+| 2 intermediate       | 2 conservative          | ~24.5 psi      |
+| 3 aggressive         | 3 intermediate          | ~24.5 psi held |
+| 4 conservative (dup) | 4 aggressive            | ~26.0 psi      |
+| 5 valet              | 5 valet (unchanged)     | ~10.0 psi      |
+
+### What a "stock" slot can and cannot be
+
+On a switch-patched bin only the 24 per-slot tables differ between slots; the
+base calibration is **shared** across all five. So a stock **slot** reverts only
+the per-slot boost target — its `PUT setpoint` grid is set to the factory
+`IP_PUT_SP` — Pressure up throttle setpoint value (~2502–2506 hPa absolute,
+~21.6 psi gauge). It still runs the shared tuned base (timing, fuelling,
+wastegate) underneath. That is the most stock a single slot can be short of
+reverting the whole tune; it is a genuine low-boost map, not a stock ECU.
+
+The stock curve is read **live** from the stock recovery bin's `IP_PUT_SP`
+full-load row and resampled onto the 12-point slot axis (see
+`_stock_full_load_curve` in the script), so it is provably the factory target
+rather than a transcribed number.
+
+The R09 min() semantics are unchanged: the base `IP_PUT_SP` ceiling stays parked
+non-binding at 30 psi and each slot's grid is the effective cap, so every slot
+curve sits below that ceiling (the library enforces it per slot).
+
+### Verification (run `R14_20260720-113133`)
+
+- **Checksums CLEAN** (CAL_CRC, ECM3); **final-bin readback PASS** — 137 tables
+  re-read off the saved bin matched the journal; **switch-patch sanity PASS** —
+  123/123 tables resolved and decoded, 52 differ from stock.
+- **Raw-diff audit vs R13: CLEAN** — 724 changed bytes, all attributed,
+  unexplained = 0. An independent byte-diff confirms the composition: 720 bytes
+  are the four reordered slot grids (slot 1 fully rewritten, slots 2–4 partially),
+  4 bytes are the CAL_CRC. **Slot 5's grid is byte-untouched**, and ECM3's stored
+  value did not change (the CAL slot region is outside ECM3 coverage).
+
+### Flash and logging gate
+
+CAL-flash eligible on the installed R07 patch set (only calibration bytes moved).
+A starting point, not a finished calibration: flash, then **drive each slot** so
+the reorder and the new stock map are confirmed in-car, log, review, iterate.
+Human review of `report.md` and the `compare/` PNGs before it reaches the car.
