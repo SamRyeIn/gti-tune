@@ -6,7 +6,13 @@ they come up. When a revision is actually built, its authoritative record moves 
 `REV_LOG.md` (per-revision rationale) and the `TUNE_Basics_Guide_R<NN>.py` header
 history — this file is the pre-work idea queue, not the change log.
 
-Current lineage tip: **R12** (see `REV_LOG.md`).
+Current lineage tip: **R13** (see `REV_LOG.md`).
+
+**R13 changed the authoring path, not the calibration** — its bin is byte-identical
+to R12's, so there is nothing new to flash and the queue below still starts from
+R12's flashed state. From R14 on, write revisions in the `simoscal.tune` API: copy
+`TUNE_Basics_Guide_R13.py`, edit the domain calls, run it. Guide:
+`Code/docs/authoring-a-revision.md`.
 
 Conventions: name every table as `` `ID` — Description `` (both, always). Switch-patch
 tables are patch-added and have **no A2L IDs** — reference them by title. See

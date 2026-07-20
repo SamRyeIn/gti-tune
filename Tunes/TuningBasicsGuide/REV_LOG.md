@@ -854,3 +854,65 @@ already installed. Log slot 5 independently, beginning with gentle operation;
 then review `IP_PUT_SP` — Pressure up throttle setpoint tracking, lambda, rail
 pressure, knock, turbo speed, and P0234 margin. Do not assume that reduced boost
 alone meets every valet-mode goal (such as speed or throttle restriction).
+
+## R13 — the R12 calibration, re-declared in the tune API
+
+**No calibration change. Nothing to flash.** R13's output bin is **byte-identical**
+to R12's, verified by full-file comparison. It exists to prove the new authoring
+path, not to change the car.
+
+### Why
+
+R12 was the end of a road. To know what it flashed you had to mentally execute
+five files: it imported private helpers from R03, R07, R08, R10, and R11, and
+monkey-patched `r11.R11_SLOT_CURVES_HPA` to inject its one change. The tuning
+intent — "cap slot 5 at 10 psi" — was about 40 lines buried in 200 lines of
+orchestration, verification, and report plumbing that every revision re-typed.
+That plumbing is where a gate gets quietly dropped, because a build with a
+missing gate produces output that looks exactly like one without.
+
+### Change: authoring path only
+
+R13 declares the complete R00–R12 calibration as one flat script with **zero
+imports from other revision scripts**, using the new `simoscal.tune` package:
+
+- Table references go through a **profile** — logical names resolved exactly
+  against the loaded XDF, or a loud failure listing every miss before any bin is
+  opened. Two profiles compose here, `SC8S50` for the base calibration and
+  `SwitchPatch2933` for the patch-added slot tables, sharing one byte buffer, so
+  the whole revision saves once instead of the save/reopen/save relay R07–R12
+  each hand-rolled.
+- Every edit is **journaled** with its `` `ID` — Description ``, units, and
+  before/after values. `report.md` is rendered from that journal, so it cannot
+  drift from what the code did.
+- `build()` owns the verification pipeline: save with checksums corrected,
+  verify off the written file, read every journaled table back off it, audit the
+  bytes against the R12 reference, draw compare plots, write the report. Any
+  failed gate raises *after* the report is written, so failures stay reviewable.
+
+The safety-relevant conversions now live in the library rather than in each
+script: `switchpatch.slot_curve(5, psi=10.0)` floors to 1705 hPa (never 1706),
+and `limits.airmass_cap_mg(2000)` writes 0.002 kg/stk — the
+`C_M_AIR_CYL_SP_MAX` — Maximum allowed airmass setpoint trap is no longer
+something to remember, because the API has no way to express the mistake.
+
+### Verification (run `R13_20260719-213357`)
+
+- **Byte-identical to R12**: the raw-diff audit reports **0 changed bytes** vs
+  `CB_HSL_SP2933_..._R12.bin`, and the script additionally asserts a full-file
+  comparison. Checksums **CLEAN**; 137 tables read back off the saved bin and
+  matched the journal; switch-patch sanity 123/123 tables resolved and decoded.
+- The audit's allowance is derived from the journal, so this is a real check:
+  an edit made outside the journal would surface as unexplained bytes rather
+  than passing quietly.
+- Locked in as `Code/tests/test_acceptance_tune.py`, which rebuilds R13 and
+  re-compares against the frozen R12 bin, and asserts R13 imports nothing from
+  another revision script.
+
+### Flash and logging gate
+
+**Do not flash R13.** It is the same bytes as the already-reviewed R12; flashing
+it would be a no-op at best. The next revision to flash is R14, which will be
+the first to use this authoring path for an actual calibration change — and it
+inherits the same rule as every revision before it: a starting point, not a
+finished calibration, reviewed by a human before it reaches the car.
