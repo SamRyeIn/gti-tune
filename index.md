@@ -26,6 +26,7 @@ Active, time-bound work.
 | | |
 |---|---|
 | Vehicle | 2017 VW GTI |
+| Transmission | DQ250 DSG (dual-clutch |)
 | Box code | `5G0906259L_0002` |
 | ECU | Simos 18.1 / 18.6 |
 | File structure | SC8S50 ("S50") |
@@ -37,8 +38,8 @@ Active, time-bound work.
 Full folder-by-folder map (with human-drop-zone vs Claude-maintained roles) in `CLAUDE.md`. Summary:
 
 - `Code/` — the `simoscal` Python library (its own git repo). Includes `Code/bin/` (stock ECU binary — the recovery image) and `Code/xdf/` (TunerPro definition files; **must match the BIN's file structure, SC8S50**).
-- `Tunes/` — tune projects: revisioned `TUNE_*_R<rev>.py` scripts, `REV_LOG.md`, timestamped run outputs.
-- `Logs/` — SimosTools datalogs, one folder per flashed revision, each with a `log_review.md`.
+- `Tunes/` — tune projects: revisioned `TUNE_*_R<rev>.py` scripts, `REV_LOG.md`, timestamped run outputs. From R13 on, a revision is one flat self-contained script in the `simoscal.tune` API — copy the previous revision, edit the domain calls, run it; `build()` owns the whole verification pipeline. Walkthrough: `Code/docs/authoring-a-revision.md`.
+- `Logs/` — SimosTools datalogs, one folder per flashed revision, each with a `log_review.md`. The `simoscal.analysis` battery (`python -m simoscal.analysis Logs/<Tune>_R<NN>`) writes a read-only, findings-only `analysis_findings.{json,md}` + evidence plots + coverage maps into the folder that Claude reads to author `log_review.md` — see `Code/README.md` § Log analysis battery.
 - `PIDs/` — SimosTools logging-list CSVs (PID definitions) + PID List Editor.
 - `Troubleshooting/` — human-dropped check-engine / fault material (codes, notes), one subfolder per topic (e.g. `CheckEngine/`); Claude analyzes what lands here.
 - `Docs/` — original source documents (`.docx`), plus `plans/` and `brainstorms/`.

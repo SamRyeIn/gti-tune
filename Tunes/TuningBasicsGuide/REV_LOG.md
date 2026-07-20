@@ -5,15 +5,31 @@ separate file; this log summarizes what changed at each step. Every run writes a
 fresh timestamped folder under `TUNE_Basics_Guide_out/R<rev>_<timestamp>/`
 holding the saved bin, `report.md`, and `compare/` PNGs.
 
-| Revision | Script                     | Summary                                                                   |
-|----------|----------------------------|---------------------------------------------------------------------------|
-| R00      | `TUNE_Basics_Guide_R00.py` | Initial revision. Base ecu-tuning-basics SOP + lambda axis re-breakpoint. |
-| R01      | `TUNE_Basics_Guide_R01.py` | R00 + six limiter/fuelling writes the recipe left at stock.               |
-| R02      | `TUNE_Basics_Guide_R02.py` | Report-honesty only; bin byte-identical to R01.                           |
-| R03      | `TUNE_Basics_Guide_R03.py` | R02 + literal 0.80 writes to the three lambda minimum-value floors.       |
-| R04      | `TUNE_Basics_Guide_R04.py` | R03 + local WOT knock-retard ignition overlay.                            |
-| R05      | `TUNE_Basics_Guide_R05.py` | R04 + wastegate feedforward overlay + X-axis re-breakpoint to cut overboost. |
-| R06      | `TUNE_Basics_Guide_R06.py` | R05 + overboost limiter symbol-map fix (now applies 1800→2700 across 6 cells). |
+## Flash-method rule for this patched lineage
+
+The one-time installation of the CBRICK, HSL, and 5-slot switch-patch ASW/code
+components requires a **full flash**. Once the ECU is confirmed to already have
+that same patch set, later tune revisions are **CAL-flash eligible**: their
+calibration changes can be sent with a CAL flash without rewriting the unchanged
+patch code. Use a full flash again when introducing, removing, or changing a
+patch/code component, or when the installed patch state is unknown. Flashing and
+the final review remain human-only steps.
+
+| Revision | Script                     | Summary                                                                                                                                                                                                                                                            |
+| -------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R00      | `TUNE_Basics_Guide_R00.py` | Initial revision. Base ecu-tuning-basics SOP + lambda axis re-breakpoint.                                                                                                                                                                                          |
+| R01      | `TUNE_Basics_Guide_R01.py` | R00 + six limiter/fuelling writes the recipe left at stock.                                                                                                                                                                                                        |
+| R02      | `TUNE_Basics_Guide_R02.py` | Report-honesty only; bin byte-identical to R01.                                                                                                                                                                                                                    |
+| R03      | `TUNE_Basics_Guide_R03.py` | R02 + literal 0.80 writes to the three lambda minimum-value floors.                                                                                                                                                                                                |
+| R04      | `TUNE_Basics_Guide_R04.py` | R03 + local WOT knock-retard ignition overlay.                                                                                                                                                                                                                     |
+| R05      | `TUNE_Basics_Guide_R05.py` | R04 + wastegate feedforward overlay + X-axis re-breakpoint to cut overboost.                                                                                                                                                                                       |
+| R06      | `TUNE_Basics_Guide_R06.py` | R05 + overboost limiter symbol-map fix (now applies 1800→2700 across 6 cells).                                                                                                                                                                                     |
+| R07      | `TUNE_Basics_Guide_R07.py` | R06 calibration on a PATCHED bin: CBRICK + HSL + 5-slot switch patch, switch-patch TC enabled on all 5 slots. Full flash to install the patch set; later matching-patch tune updates are CAL-flash eligible.                                                       |
+| R08      | `TUNE_Basics_Guide_R08.py` | R07 + top-end wastegate FF deepening: 6 cells lowered in IP_FAC_BPA_SP[0]/[1], row-weighted onto Int 1.05. CAL-flash eligible after the R07 patch set is installed.                                                                                                |
+| R09      | `TUNE_Basics_Guide_R09.py` | R08 + slot-2 boost to a 26 psi shelf: base IP_PUT_SP reshape + slot 1/3/4/5 PUT caps hold R08. CAL-flash eligible after the R07 patch set is installed.                                                                                                            |
+| R10      | `TUNE_Basics_Guide_R10.py` | R09 + reshape IP_PQ_CHA_MAX (max compressor pressure ratio): 1.70 @ 1000 rpm, flat 3.1 @ 2000-7000 rpm, to clear the code-128 cap trimming the shelf. CAL-flash eligible after the R07 patch set is installed.                                                     |
+| R11      | `TUNE_Basics_Guide_R11.py` | R10 + park `IP_PUT_SP` — Pressure up throttle setpoint at 30 psi gauge-equivalent full-load ceiling; all five switch-patch `PUT setpoint` grids become explicit lower caps on a shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed. |
+| R12      | `TUNE_Basics_Guide_R12.py` | R11 + repurpose slot 5 as a valet map: its patch `PUT setpoint` grid is a flat 1705 hPa absolute cap (9.993 psi gauge) across the shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed.                                               |
 
 ## R00 — Initial revision
 
@@ -309,3 +325,594 @@ Still **revision 6 — a starting point, not a finished calibration**. Now that 
 overboost diagnosis threshold is actually raised, watch the next log to confirm no
 spurious P0234 and that the wastegate overlay + this limiter work together as
 intended.
+
+## R07 — patched bin (CBRICK + HSL + switch patch) with switch-patch TC enabled
+
+**⚠ Full flash required to install the patch set.** R07 introduces the
+switch-patched ASW/code components, so its first patch-installation flash must be
+full. After that same patch set is installed on the ECU, CAL-only flashes are
+appropriate for later calibration updates in this lineage; do not use CAL-only to
+introduce, replace, or remove patch/code components.
+
+Based on R06. Runs the **exact R06 base-calibration pipeline unchanged** (lambda
+axis re-breakpoint, R01 limiter/fuelling writes, R03 lambda floors, R04
+knock-retard timing overlay, R05 wastegate feedforward overlay + X-axis
+re-breakpoint, R06 overboost-limiter fix) with **no new base-calibration tuning**.
+Relative to the R06 saved bin, R07 gains exactly four things:
+
+1. **`SL CBRICK v1.2 - S50.btp`** — SimosTools anti-brick patch, applied (19 bytes,
+   ASW only).
+2. **`SL HSL v1.1 - S50.btp`** — High Speed Logging (Mode3E) patch, applied (477
+   bytes, ASW only).
+3. **`SL PATCH.29.33 - S50.btp`** — the 5-slot on-the-fly map switch patch (v29.33),
+   applied (10130 bytes; 3404 in CAL slot storage, the rest ASW).
+4. **Switch-patch traction control enabled on all five slots** — the patch-added
+   flags `Enable SL TC` — Enable the switch-patch's own slip-based traction control,
+   and `Disable OEM TC` — Disable the factory ECU-side TC torque intervention, each
+   set `0 → 1` on slots 1–5 (addresses `0x7D83F`–`0x7D843` and `0x7D83A`–`0x7D83E`).
+
+### Pipeline order — investigated, not assumed
+
+Two candidate orderings were tested empirically (2026-07-11): **(A)** patch the
+stock bin first, then run the R06 CAL-edit pipeline on the patched base; **(B)** run
+the R06 pipeline on stock first, then apply the patches. Findings:
+
+- All three patches are `READY_TO_ACCEPT` on stock and confined on each other
+  (`btp.apply` diff ⊆ declared blocks for every patch).
+- The R06 CAL edits (~13.6 KB across the base calibration) and the patch-modified
+  regions are **fully disjoint**: **0** R06-edited bytes fall inside any patch's
+  declared blocks, and **0** bytes are changed by both. So order (B)'s
+  byte-exact `.btp` pre-verify still passes (all three patches remain
+  `READY_TO_ACCEPT` on the R06 bin), and orders (A) and (B) were confirmed to
+  produce a **byte-identical** final bin.
+- **Order (A) is used** — it reuses the R06 pipeline verbatim on the patched base,
+  matching the canonical `demos/apply_btp_patch.py` "the patched bin is the base for
+  tune revisions" flow. Two-XDF flow: the R06 CAL edits use `SC8S50.V1.0.xdf`
+  exactly as R06; the TC flags, slot inspection, and `switch_patch_sanity` use
+  BinToolz's `S50 Switch Patch.29.33.V2.xdf` (the curated `v1.005/.006` XDFs do not
+  load under `simoscal` — reused uniqueids; U1).
+
+### Slot-inheritance finding — no shadowing; R06 cal is global
+
+The open question — *do the five map slots copy base-CAL tables into per-slot
+storage, so the R06 edits would fail to propagate?* — was investigated against the
+patched bin's `Map Slot 1–5` categories (120 tables, 24 distinct titles). The
+switched tables are **feature-enable flags and additive modifiers / independent
+per-slot limits**: `PUT setpoint`, `RPM limiter`, `Speed limiter`, `Lambda
+modifier`, `Spark modifier`, `Torque Request AT/MT Type 1–3`, `Enable
+LC/NLS/RAL/flex-fuel`, `Pops enable`, `Gauge settings`. **None are copies of the
+R06-edited base tables** (lambda setpoint grid, timing, wastegate feedforward,
+limiters). The R06 base calibration is therefore **global** — it applies under every
+slot, and **no per-slot re-writes are needed** for the R06 tune to take effect. This
+is corroborated at the byte level: 0 R06-edited bytes lie in any patch/slot block,
+and a `unique_tables()` value-compare shows **0 of 3814** CAL tables differ between
+R07 and R06.
+
+> **Flagged for Sam (not tuned by R07):** the per-slot `PUT setpoint`, `RPM
+> limiter`, and `Speed limiter` tables carry the **patch author's baked defaults**,
+> independent of the R06 calibration. Inspect them (BinToolz XDF, `Map Slot 1–5`)
+> before relying on a given slot.
+
+### TC decision (flagged for veto) and behaviour defaults
+
+**Decision:** both TC flags set to `1` on **all five slots**, so TC behaviour is
+uniform regardless of the stalk-selected slot. **Sam can veto** — e.g. leave one
+slot with OEM TC intact as a "safe" map; it is a one-line change to the address
+tuples in the script. All ten flags read the expected as-patched `0` before the
+write and decode to `1` on the saved bin. The **TC behaviour tables** (category
+`TC`, `0xF8`: `Slip target straight`, PID I/D weights and clamps, `Slip ignition
+weight` / `Slip WG weight`, `Minimum timing`, `SCC Threshold`/`SCC duration`, …) are
+**NOT tuned** — their as-patched defaults are dumped in `report.md` for review;
+changing them is a future revision informed by logs.
+
+### Verification (run `20260711-185725`, all mandatory checks pass)
+
+- Each patch `btp.check` = `READY_TO_ACCEPT`; each `apply` `confined = True`;
+  per-patch `format_change_report`s saved under `patches/`.
+- `switch_patch_sanity` on the final bin: 123 slot/switch tables resolved, 123
+  decoded, 0 errors, **plausible = YES**.
+- **Full-bin byte diff, R07 vs a freshly-generated R06 bin: 10640 bytes differ, all
+  accounted for** — 10626 inside the three patches' declared blocks, 10 TC flag
+  bytes (`0x27D83A`–`0x27D843`), 4 `CAL_CRC` bytes (`0x200304`). **0 unexplained.**
+  (ECM3's stored value is unchanged — the patches and TC flags touch no
+  ECM3-covered area.)
+- Re-opening with the BinToolz XDF: all ten TC flags decode to `1`.
+- `unique_tables()` value-compare vs R06 over the `SC8S50.V1.0.xdf` CAL region:
+  **0 of 3814 tables differ** — the R06 calibration is preserved exactly; the
+  patches and flags live outside those tables.
+- Checksums on the saved bin: **`CAL_CRC` corrected + CLEAN, `ECM3` CLEAN**;
+  **ASW/code-block checksums are not-verifiable in `simoscal`** (SimosTools/VW_Flash
+  compute them at full-flash time — stated, never assumed clean).
+- No library code was modified (R07 is a pure consumer script), so the `Code` test
+  suite was not required to re-run.
+
+### Flash + logging notes
+
+For the initial patch installation, use a **FULL FLASH**, with a known-good stock
+recovery image on hand and the battery on a charger. Once that patch set is
+already installed, later calibration-only updates may use **CAL flash**. The HSL
+patch enables **Mode3E high-speed logging**,
+but the SimosTools app must have an **HSL PID list imported** to actually log it
+(see `PIDs/` and `knowledge/simostools-app-guide.md`); gear indexing in the
+resulting logs depends on which PID list is loaded (`Gear ()` = zero-indexed +1
+offset vs `Gear (gear)` = actual — see `CLAUDE.md`; check the CSV header first).
+
+Still **revision 7 — a starting point, not a finished calibration**. The script
+never flashes; the deliverable ends at a verified bin + report + PNGs + this
+entry, and Sam reviews before flashing.
+
+**Post-review script hardening (2026-07-11, no calibration change).** Two
+behavior-only fixes from the R07 code review were applied in place to
+`TUNE_Basics_Guide_R07.py`; **the saved bin is byte-identical** (sha256
+`6a23f7fe829bed2aeeb5a0e203e103407f0477aa`, confirmed by re-running and `cmp`):
+(1) `main()` now raises `SystemExit` with the issues message when the verification
+`problems` list is non-empty, so a scripted caller detects failure with a nonzero
+exit — `report.md` is still written first so the failure stays reviewable
+(negative-tested by monkeypatching `switch_patch_sanity` to force a
+not-plausible result: the process raised `SystemExit` and still wrote `report.md`,
+then the throwaway run folder was deleted); (2) the intermediate stage-bin save's
+blanket `warnings.simplefilter("ignore")` was narrowed to only
+`StaleChecksumWarning` (from `simoscal.checksum`), so an unexpected warning can no
+longer be masked — narrowing surfaced no previously-swallowed warning. No `Code/`
+library or `BinToolz-main/` files were touched.
+
+## R08 — top-end wastegate feedforward deepening
+
+**⚠ CAL flash eligible after R07 patch installation.** R08 retains R07's
+switch-patched ASW/code components, so an ECU already running that verified patch
+set can receive this calibration update by CAL flash. A full flash is required if
+the patch/code components are being installed or changed.
+
+Based on R07. Runs the **exact R07 pipeline unchanged** (three `.btp` patches on
+the stock bin, full R06 CAL-edit pipeline on the patched base, switch-patch TC
+flags = 1 on all five slots) and adds exactly one change: **six cells lowered in
+`IP_FAC_BPA_SP[0]` / `IP_FAC_BPA_SP[1]`  — Wastegate Position Feedforward VVL 0/1**
+(XDF title "Map for boost pressure actuator setpoint"), identical deltas to both
+tables:
+
+| Cell (row, col) | Int FF × Exh FF | R07 → R08       | Delta  |
+|-----------------|-----------------|-----------------|--------|
+| (6, 14)         | 0.90 × 1.00     | 0.675 → 0.655   | −0.02  |
+| (6, 15)         | 0.90 × 1.40     | 0.630 → 0.610   | −0.02  |
+| (7, 14)         | 1.05 × 1.00     | 0.600 → 0.540   | −0.06  |
+| (7, 15)         | 1.05 × 1.40     | 0.565 → 0.525   | −0.04  |
+| (8, 14)         | 1.25 × 1.00     | 0.545 → 0.485   | −0.06  |
+| (8, 15)         | 1.25 × 1.40     | 0.515 → 0.475   | −0.04  |
+
+### Why — clean 3rd-gear R07 logs only
+
+Evidence base: `Logs/BasicsGuide_R07/`, the three clean actual-3rd-gear WOT pulls
+(16_02_51 / 16_05_57 / 16_07_36). The two 2nd-gear pulls were excluded: 16_04_31
+is spool-transient-dominated, and 16_10_19 is contaminated by switch-patch TC
+interventions (up to 11.5 km/h front-vs-rear wheel slip, torque cut ~410 → 220-290
+Nm) — which also explains that pull's lean-lambda battery finding.
+
+- Mid-range 3300–5800 rpm tracks at **+0.1 kPa mean** — the R05 overlay did its
+  job; its cells are not touched again.
+- Top-end 5800–6700 rpm holds a sustained **+8.5 kPa mean / +15.1 kPa max**
+  overshoot (worst band 6200–6700: +10.6 kPa) while the WG integral reaches only
+  ~−16% — headroom available, so the feedforward base is short and the loop slow.
+- **The flow-factor trajectory is a hysteresis loop, not monotonic with rpm.**
+  Exh flow factor peaks ~1.33 at 5200–5800 rpm (tracking GOOD there, −2.4 kPa) and
+  falls back to ~1.10 by 6200–6700 rpm (WORST overshoot). Good and bad regions
+  overlap in Exh-flow space; the discriminator is the **intake** flow factor row —
+  the worst band runs Int ~1.04 (93% weight on the Int 1.05 row), the good bands
+  Int ~0.94–1.00. Hence the row-weighted shape: deep on Int 1.05 (and its Int 1.25
+  mirror blend, log max Int 1.063), light on Int 0.90.
+
+Sizing was verified by simulating the ECU's bilinear lookup at every logged
+clean-pull WOT point before/after: **−5.2% WG position mean in the worst
+6200–6700 band** (~70% of the guide's 0.05-per-psi rule for +10.6 kPa — a
+conservative second pass), −3.3 to −3.9% in the adjacent 3300–5800 bands (absorbed
+by I-terms currently idling at −4 to −6% doing feedforward's work), and exactly
+0.000 below 3300 rpm (spool untouched). Because the same four cells serve both the
+good 4500–5800 region and the overshooting top end, some mid-band opening is
+unavoidable; the closed loop has authority to trim it back.
+
+### Verification (run `R08_20260712-170312`)
+
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`); patches confined; switch-patch sanity
+  plausible (123/123 decoded); all 10 TC flags read back 1.
+- `cal.unique_tables()` value-compare vs the flashed R07 bin
+  (`R07_20260711-223757`, byte-identical to the other R07 run folder): **exactly 2
+  tables changed** — the two wastegate maps, 6 cells each, exact intended deltas.
+- Raw byte diff vs R07: **28 bytes** = 12 cells × 2 bytes + the 4-byte `CAL_CRC`
+  at file offset `0x200304`. Nothing else moved.
+- No library code modified (pure consumer script); `Code` test suite not required.
+
+### Flash + logging notes
+
+CAL flash is appropriate when the R07 patch set is already installed; otherwise
+use a full flash. Keep the stock recovery image on hand and the battery on a
+charger.
+For the validation logs: prefer **3rd-gear pulls to redline (≥6500 rpm)** so the
+5800–6700 band is well covered, plus one 2nd-gear pull if TC feel is being
+evaluated (keep it out of boost-FF conclusions). Same PID list as the R07 logs so
+channels stay comparable.
+
+Still **revision 8 — a starting point, not a finished calibration**. The script
+never flashes; the deliverable ends at a verified bin + report + PNGs + this
+entry, and Sam reviews before flashing.
+
+## R09 — slot-2 boost increase to a 26 psi shelf
+
+**⚠ CAL flash eligible after R07 patch installation.** R09 retains R07's
+switch-patched ASW/code components, so an ECU already running that verified patch
+set can receive this calibration update by CAL flash. A full flash is required if
+the patch/code components are being installed or changed.
+
+Based on R08. Runs the **exact R08 pipeline unchanged** (three `.btp` patches,
+full R06 CAL pipeline, R05 + R08 wastegate feedforward overlays, switch-patch TC
+flags = 1 on all five slots) and adds **two** changes that raise the boost target
+on **map slot 2 only** to a rounded 26 psi (gauge) plateau.
+
+**Change 1 — base `IP_PUT_SP`  — Boost pressure setpoint: full-load reshape.**
+The full-load (top) row is reshaped into a 26 psi shelf between 3400 and 4400 rpm,
+joining the R08 tail from 5000 rpm up, by **re-breakpointing the table's own RPM
+axis** `ldp_n_ip_put_sp` (0x2fd2). That axis is grep-verified referenced by
+nothing except `IP_PUT_SP`, so the re-breakpoint has **zero blast radius**. The
+stock axis wastes a column on 2000 rpm (redundant — 2000 and 3000 both sit at
+24.4 psi), so that column is spent on the new 3400 breakpoint; below 3000 rpm the
+ECU clamps to the first column (24.4 psi), byte-identical low-end behaviour to R08.
+
+| rpm (new) | rpm (old) | R08 psi | R09 psi | R08 hPa | R09 hPa |
+|-----------|-----------|---------|---------|---------|---------|
+| 3000      | 2000      | 24.4    | 24.4    | 2699    | 2699    |
+| 3400      | 3000      | 24.4    | 26.0    | 2699    | 2809    |
+| 4400      | 4000      | 21.5    | 26.0    | 2500    | 2809    |
+| 5000      | 5000      | 19.3    | 24.6    | 2350    | 2712    |
+| 5750      | 5750      | 18.6    | 21.8    | 2299    | 2519    |
+| 6500      | 6500      | 17.2    | 17.8    | 2199    | 2243    |
+
+(ambient conversion: `hPa_abs = psi_gauge × 68.95 + 1016`.) Only the full-load row
+and the shared RPM axis change; the three part-load rows are left as-is.
+
+**Change 2 — slot 1/3/4/5 PUT-setpoint caps held at the R08 curve.**
+`IP_PUT_SP` is the shared ceiling for all five slots, so raising it alone would
+raise all five. The switch patch adds a per-slot PUT-setpoint **cap** (8×12, hPa)
+that binds by `min()` against the base; all five ship at a uniform 4000 hPa
+(~43 psi, non-binding), which is why the car currently follows the base. The caps
+for slots 1/3/4/5 (`0x7D41A` / `0x7D59A` / `0x7D65A` / `0x7D71A`) are filled with
+the R08 full-load curve resampled onto the cap's own 12-point RPM axis, written to
+**all eight load rows** so they bind at full load regardless of the cap's
+uncharacterised raw 0–7 load-axis, while staying well above the ≤1062 hPa
+part-load base. **Slot 2 (`0x7D4DA`) is left untouched** → it sees the full raised
+base = the 26 psi shelf.
+
+- Slot 1 = `0x7D41A` → cap = R08 curve
+- Slot 2 = `0x7D4DA` → **untouched** (4000 hPa non-binding) → 26 psi
+- Slot 3 = `0x7D59A` → cap = R08 curve
+- Slot 4 = `0x7D65A` → cap = R08 curve
+- Slot 5 = `0x7D71A` → cap = R08 curve
+
+### Cap semantics = min() — evidenced, not yet in-car proven
+
+All five caps sit at 4000 hPa today while the car tracks the ~2699 hPa base — this
+is only possible under `min()` (cap) semantics, not override (the car would
+target 43 psi). The clean confirmation is still an **in-car check: a slot-1 pull
+on R09 must match R08 exactly.** If slot 1 shows the 26 psi shelf, the cap
+direction is wrong — flagged in the R09 report as a first-drive gate.
+
+### Verification (run `R09_20260712-213556`)
+
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`); patches confined; switch-patch sanity
+  plausible (123/123 decoded); all 10 TC flags read back 1.
+- `cal.unique_tables()` value-compare vs the R08 bin (`R08_20260712-170312`) across
+  **both** XDFs: **SC8S50** — exactly 2 tables changed, `IP_PUT_SP` (0x1b6e2) and
+  its RPM axis (0x2fd2); **BinToolz S50** — exactly 4 tables changed, the slot
+  1/3/4/5 caps. Slot 2 (0x7d4da) and all 10 TC flags **unchanged**. Nothing else
+  moved.
+- Final-bin readback: RPM axis = `[3000, 3400, 4400, 5000, 5750, 6500]`, full-load
+  row psi = `[24.4, 26.0, 26.0, 24.6, 21.8, 17.8]`, each capped slot = the R08
+  curve tiled across 8 rows, slot 2 still 4000 hPa — all confirmed by the script's
+  own verify step (`base_ok` / `caps_ok` / `slot2_ok`).
+- No library code modified (pure consumer script); `Code` test suite not required.
+
+### Flash + logging notes
+
+CAL flash is appropriate when the R07 patch set is already installed; otherwise
+use a full flash. Keep the stock recovery image on hand and the battery on a
+charger.
+Drive **slot 2** for the boost validation. First-drive gates and watch items:
+
+- **Slot-1 pull first** — confirm it matches R08 (cap-semantics proof) before
+  leaning on slot 2.
+- **Fuel system** — R08 already ran LPFP ~84.7% duty / HPFP ~94.3% effective
+  volume at lower boost; the +4 to +5.4 psi midrange on slot 2 may become
+  fuel-limited. Watch rail-pressure hold and LPFP duty.
+- **Knock at 3000–3500 rpm** — the plateau now sits right where R07 logged
+  −2.6/−3.0° retard episodes; timing is at the edge, not conservative.
+- Prefer 3rd-gear pulls to redline (≥6500 rpm); same PID list as the R07/R08 logs.
+
+Still **revision 9 — a starting point, not a finished calibration**. The script
+never flashes; the deliverable ends at a verified bin + report + PNGs + this
+entry, and Sam reviews before flashing.
+
+## R10 — reshape the compressor pressure-quotient cap to unclamp the 26 psi shelf
+
+**⚠ CAL flash eligible after R07 patch installation.** R10 retains R07's
+switch-patched ASW/code components, so an ECU already running that verified patch
+set can receive this calibration update by CAL flash. A full flash is required if
+the patch/code components are being installed or changed.
+
+Based on R09. Runs the **exact R09 pipeline unchanged** (three `.btp` patches on
+the stock bin, full R06 CAL pipeline, R05 + R08 wastegate feedforward overlays,
+switch-patch TC flags = 1 on all five slots, the R09 base `IP_PUT_SP` 26 psi
+shelf reshape, and the R09 slot 1/3/4/5 PUT-setpoint caps) and adds **exactly one
+calibration change**:
+
+- `IP_PQ_CHA_MAX`  — Maximum allowed pressure quotient at turbo charger
+  compressor (8×8, unitless): reshaped from flat **2.80** to the ecu-tuning-basics
+  SOP's default RPM shape — **1.70 at the 1000 RPM breakpoint** (column 0, all 8
+  Y rows), **flat 3.1 from ~2000 up to 7000 RPM** (columns 1–7, all 8 Y rows). The
+  table's X axis is RPM `[1000, 2000, 3000, 4000, 5000, 6000, 6500, 7000]`, shared
+  identically across all 8 rows. (The stock table is flat 9.30; the
+  ecu-tuning-basics SOP recipe flattens it to 2.80 as part of the Option-2 boost
+  method, so the R09 baseline this revision builds on already reads a uniform
+  2.80.) XDF z-data at 0x1ab9a (uint16, scale 1/4096); 3.1 stores raw 12698 =
+  3.100098 decoded, 1.70 stores raw 6963 = 1.700195 decoded.
+
+### Why — R09 slot-2 logs (`Logs/BasicsGuide_R09/log_review.md`)
+
+R09 proved the slot-2 26 psi full-load shelf is delivered **~1.0–1.4 psi short**
+(actual ~24.6–25.3 psi against the 26.0 target from 3300–5800 rpm), and the
+shortfall is **commanded, not plant**:
+
+- `Torque Lim ()` code 128 — "Temporary torque limitation because of operation at
+  maximum charge pressure ratio (Max Pressure ratio table)" (guide p. 29) —
+  appears **only** on slot-2 files and **only** at 3500–4800 rpm (the shelf zone;
+  233 samples across the five slot-2 pulls). That table is `IP_PQ_CHA_MAX`.
+- Delivered slot-2 PUT plateaus at exactly **2.80 × the measured pre-compressor
+  pressure** — the cap, not the wastegate, sets the achievable boost. The
+  persistent positive wastegate integral (+15 %, gate held 67–72 % closed) is the
+  closed loop chasing the un-trimmed logged `PUT SP` while the limiter caps the
+  achievable setpoint downstream — NOT a feedforward shortfall.
+
+Required PQ to clear the shelf, from 219 settled capped log rows: **2.887–2.958**
+on the logged day (~101.6 kPa ambient) and **~3.02** on a low-pressure (99 kPa)
+day. So 3.0 is insufficient margin; **3.1 clears the worst realistic sea-level
+case with ~0.08 headroom**. This cap is genuine compressor protection near the
+IS20 map edge (turbo speed was already 208 of 220 krpm on shelf pulls, and the
+6000-ft use case pushes PQ up at fixed boost). Sam has **explicitly acknowledged
+the compressor-protection risk and requested 3.1**.
+
+### Verification (run `R10_20260713-000102`)
+
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`); patches confined; switch-patch sanity
+  plausible (123/123 decoded); all 10 TC flags read back 1.
+- `cal.unique_tables()` value-compare vs the R09 bin (`R09_20260712-213556`)
+  across **both** XDFs: **SC8S50** — exactly **1** table changed of 3814,
+  `IP_PQ_CHA_MAX` (0x1ab9a); **BinToolz S50** — **0** of 185 changed (all four
+  slot caps, slot 2, and all 10 TC flags unchanged). Nothing else moved.
+- Raw byte diff vs R09: **132 bytes** = 64 cells × 2 bytes in the PQ z-data
+  (0x21ab9a–0x21ac1a) + the 4-byte `CAL_CRC` at file offset 0x200304. **0
+  unexplained.**
+- Final-bin readback: `IP_PQ_CHA_MAX` column 0 (1000 rpm, all 8 rows) decodes to
+  **1.699951**; columns 1–7 (2000–7000 rpm, all 8 rows) decode to **3.100098**
+  (both within the 1/4096 ≈ 2.44e-4 storage resolution); the R09 base reshape,
+  slot caps, and slot-2 non-binding default all still read back correct
+  (`base_ok` / `caps_ok` / `slot2_ok` / `pq_ok` all pass in the script's own
+  verify step).
+- **Comparison PNGs scoped to what actually changed.** `compare/` holds only
+  `IP_PQ_CHA_MAX__compare_{heatmap,surface}.png` (R09 flat-2.80 baseline vs the
+  R10 reshape). Earlier R10 drafts also regenerated the `IP_FAC_BPA_SP[0]`/`[1]`
+  wastegate composites and the R09 boost-curve PNG inherited unchanged from
+  R08/R09 — those were dropped: a before/after composite for a table this
+  revision does not touch misleadingly implies R10 changed it. Their true
+  before/after lineage lives in the R08 and R09 reports/`compare/` folders.
+- No library code modified (pure consumer script); `Code` test suite not required.
+
+### Flash + logging notes
+
+CAL flash is appropriate when the R07 patch set is already installed; otherwise
+use a full flash. Keep the stock recovery image on hand and the battery on a
+charger.
+Drive **slot 2** for the boost validation; same PID list as the R07/R08/R09 logs,
+3rd-gear pulls to redline (≥6500 rpm). Watch items:
+
+- **Turbo speed** — 208 of 220 krpm (~5 % margin) on R09 shelf pulls; clearing
+  the cap delivers more boost and will push it higher. **Primary safety watch.**
+- **HPFP effective volume** — 97–98 % (at ceiling) on R09 shelf pulls; almost no
+  high-pressure-pump headroom for more airmass. Watch rail-pressure hold and
+  lambda.
+- **`Torque Lim ()` code 128** — should now be **silent** in the shelf zone (the
+  direct proof the cap was the constraint); confirm the shelf now delivers ~26 psi.
+- Top-end down-ramp / P0234 margin (775 hPa on R09) and knock at 3000–3500 rpm
+  (cyl 1 recurring at −3.0°): unchanged by R10, keep watching.
+
+Still **revision 10 — a starting point, not a finished calibration**. The script
+never flashes; the deliverable ends at a verified bin + report + PNGs + this
+entry, and Sam reviews before flashing.
+
+## R11 — switch-patch PUT maps become the effective WOT target curves
+
+**⚠ CAL flash eligible after R07 patch installation.** R11 retains R07's
+switch-patched ASW/code components, so an ECU already running that verified patch
+set can receive this calibration update by CAL flash. A full flash is required if
+the patch/code components are being installed or changed.
+
+R11 is rebuilt from the untouched stock recovery image through the established
+three-patch → R06 → R08 → R10 pipeline. It deliberately does **not** run the
+R09 base-shape or cap helpers: R11's architecture is an explicit new minimum
+chain, proven by the R09 logs to be
+`min(IP_PUT_SP — Pressure up throttle setpoint, active-slot PUT setpoint)`.
+The switch-patch `PUT setpoint` grid is a lower cap, not an override.
+
+### Shared base: parked but non-binding
+
+R11 retains the R09 private `ldp_n_ip_put_sp` RPM layout
+`[3000, 3400, 4400, 5000, 5750, 6500]` and changes only the full-load row of
+`IP_PUT_SP` — Pressure up throttle setpoint. All six cells read back
+**3085.03 hPa absolute** (30.0 psi gauge-equivalent using the documented 1016
+hPa ambient reference and 68.95 hPa/psi conversion). The three lower load rows
+are raw-byte-identical to R10. This is a deliberately non-binding shared
+ceiling, not a 30 psi delivery request: every selectable patch slot is verified
+below it.
+
+### Patch target axis and cap placement
+
+The patch-added **`PUT SP RPM Axis`** at `0x7D7DC` is now the shared twelve-point
+axis `[3000, 3200, 3400, 3800, 4400, 4700, 5000, 5400, 5750, 6000, 6250, 6500]`.
+It preserves each R09 `IP_PUT_SP` — Pressure up throttle setpoint anchor while
+adding round-number resolution where the target tapers. Its associated
+**`PUT SP RPM Axis Header`** at `0x7D7DA` still reads **12**. The patch Y-axis is
+still uncharacterized, so each 12-cell curve is tiled unchanged over all eight
+rows of its 8 × 12 **`PUT setpoint`** grid.
+
+| Slot | Patch `PUT setpoint` Z-data | R11 role | Stored full-load curve (hPa absolute) |
+|---:|---|---|---|
+| 1 | `0x7D41A` | Conservative R08-style | Resampled R08 curve |
+| 2 | `0x7D4DA` | Intermediate | `[2699, 2699, 2699, 2699, 2699, 2645, 2589, 2503, 2414, 2350, 2286, 2223]` |
+| 3 | `0x7D59A` | Former high map | Resampled former R10 slot-2 target curve |
+| 4 | `0x7D65A` | Retained safety map | Resampled R08 curve |
+| 5 | `0x7D71A` | Retained safety map | Resampled R08 curve |
+
+Slot 2 follows the approved bright-green sketch: it is flat at 2699 hPa
+(24.4 psi gauge) through 4400 rpm, then tapers approximately through 22.3 psi
+at 5200 rpm to 17.5 psi at 6500 rpm. Its maximum equals slot 1's; every
+post-4400 breakpoint is strictly above the resampled slot-1 curve. Slots 1, 4,
+and 5 are identical R08-style curves. Slot 3 receives the former R10 slot-2
+**target curve** (the 26 psi shelf) rather than a copied 4000 hPa non-binding
+default grid.
+
+### Verification (run `R11_20260713-112124`)
+
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`); all ten inherited switch-patch TC
+  flags decode to 1; switch-patch sanity is plausible (123/123 decoded).
+- Dual-XDF value comparison vs the known R10 reference is exactly scoped:
+  **SC8S50** changes only `IP_PUT_SP` — Pressure up throttle setpoint; the
+  switch-patch XDF changes only its **`PUT SP RPM Axis`** and all five
+  **`PUT setpoint`** grids. `IP_PQ_CHA_MAX` — Maximum allowed pressure quotient
+  at turbo charger compressor is raw-identical to R10.
+- Readback proves the base full-load row is flat at ~3085 hPa, all five grids
+  are their intended eight-row tiles, every cap is below the shared ceiling,
+  no grid retains the dangerous 4000 hPa default, and the header remains 12.
+- Raw diff vs R10 is **813 bytes**. Every changed byte belongs to the declared
+  `IP_PUT_SP` — Pressure up throttle setpoint full-load cells, shared patch
+  **`PUT SP RPM Axis`**, five **`PUT setpoint`** grids, or corrected `CAL_CRC`;
+  **0 unexplained**.
+- `compare/r11_all_slot_targets.png` shows the parked shared ceiling and all
+  five effective target curves. `compare/r11_slots_1_2_3_boost_target.png`
+  shows slots 1–3 with the requested fixed 0–30 psi-gauge Y scale. The
+  `IP_PUT_SP` comparison composites use R10→R11 (their private axis matches);
+  the dedicated curves are the honest artifact for the changed patch axis.
+
+### Flash and logging gate
+
+This remains **revision 11 — a starting point, not a finished calibration**.
+Sam must visually review the report and all curve assets before flashing (CAL is
+eligible when the R07 patch set is already installed), with the untouched recovery
+image and a charger available. Post-flash logs must
+review turbo speed, rail-pressure hold/HPFP volume, lambda, knock,
+charge-pressure-ratio limiting, boost tracking, and P0234 margin. R11 relocates
+the existing 26 psi request to slot 3; it does not authorize a new peak request.
+
+## R12 — slot-5 valet boost cap
+
+**⚠ CAL flash eligible after R07 patch installation.** R12 retains the identical
+three-patch ASW/code set and all inherited R11 calibration. It repurposes the
+existing fifth selectable switch-patch slot rather than attempting to add a sixth
+slot, which would require a separate code-patch design and full-flash review.
+
+### Change: slot 5 is capped below 10 psi gauge
+
+The patch-added slot-5 **`PUT setpoint`** grid at `0x7D71A` is a shared-axis 8 ×
+12 grid. Its Y axis remains uncharacterized, so the same curve is intentionally
+tiled across all eight rows. On the established **`PUT SP RPM Axis`** at
+`0x7D7DC` (`[3000, 3200, 3400, 3800, 4400, 4700, 5000, 5400, 5750, 6000, 6250,
+6500]` rpm), R12 writes every slot-5 cell to **1705 hPa absolute**.
+
+Using the documented 1016 hPa ambient reference and 68.95 hPa/psi conversion,
+this is **9.993 psi gauge**. The value is floored rather than rounded so it cannot
+exceed the requested 10 psi-gauge maximum. With the R09-proven min() semantics,
+the active slot's `PUT setpoint` grid is a lower cap beneath the shared
+`IP_PUT_SP` — Pressure up throttle setpoint ceiling, so slot 5 becomes the
+effective full-load valet boost ceiling. This is a boost-only valet measure:
+it does not change pedal, torque, speed, ignition, lambda, or traction-control
+calibration.
+
+### Verification (run `R12_20260715-165615`)
+
+- Checksums **CLEAN** (`CAL_CRC` + `ECM3`); all ten inherited switch-patch TC
+  flags decode to 1; switch-patch sanity remains plausible.
+- The final slot-5 readback is eight identical rows of twelve 1705 hPa cells.
+  Every other slot retains its R11 curve, and the shared axis/header and
+  `IP_PUT_SP` — Pressure up throttle setpoint remain unchanged.
+- Raw R11→R12 audit finds **196 changed bytes**, all confined to the 192 bytes of
+  the slot-5 `PUT setpoint` grid plus four corrected `CAL_CRC` bytes; **0
+  unexplained** bytes.
+- Review `compare/r12_slot5_valet_target.png`,
+  `compare/r12_all_slot_boost_targets.png`, and the slot-5 comparison assets in
+  the generated output before flashing. The all-slot plot retains both slot 1
+  and slot 4 as distinct solid/dashed traces even though their values coincide.
+
+### Flash and logging gate
+
+This remains **revision 12 — a starting point, not a finished valet calibration**.
+After human review, CAL flash is eligible only if the verified R07 patch set is
+already installed. Log slot 5 independently, beginning with gentle operation;
+then review `IP_PUT_SP` — Pressure up throttle setpoint tracking, lambda, rail
+pressure, knock, turbo speed, and P0234 margin. Do not assume that reduced boost
+alone meets every valet-mode goal (such as speed or throttle restriction).
+
+## R13 — the R12 calibration, re-declared in the tune API
+
+**No calibration change. Nothing to flash.** R13's output bin is **byte-identical**
+to R12's, verified by full-file comparison. It exists to prove the new authoring
+path, not to change the car.
+
+### Why
+
+R12 was the end of a road. To know what it flashed you had to mentally execute
+five files: it imported private helpers from R03, R07, R08, R10, and R11, and
+monkey-patched `r11.R11_SLOT_CURVES_HPA` to inject its one change. The tuning
+intent — "cap slot 5 at 10 psi" — was about 40 lines buried in 200 lines of
+orchestration, verification, and report plumbing that every revision re-typed.
+That plumbing is where a gate gets quietly dropped, because a build with a
+missing gate produces output that looks exactly like one without.
+
+### Change: authoring path only
+
+R13 declares the complete R00–R12 calibration as one flat script with **zero
+imports from other revision scripts**, using the new `simoscal.tune` package:
+
+- Table references go through a **profile** — logical names resolved exactly
+  against the loaded XDF, or a loud failure listing every miss before any bin is
+  opened. Two profiles compose here, `SC8S50` for the base calibration and
+  `SwitchPatch2933` for the patch-added slot tables, sharing one byte buffer, so
+  the whole revision saves once instead of the save/reopen/save relay R07–R12
+  each hand-rolled.
+- Every edit is **journaled** with its `` `ID` — Description ``, units, and
+  before/after values. `report.md` is rendered from that journal, so it cannot
+  drift from what the code did.
+- `build()` owns the verification pipeline: save with checksums corrected,
+  verify off the written file, read every journaled table back off it, audit the
+  bytes against the R12 reference, draw compare plots, write the report. Any
+  failed gate raises *after* the report is written, so failures stay reviewable.
+
+The safety-relevant conversions now live in the library rather than in each
+script: `switchpatch.slot_curve(5, psi=10.0)` floors to 1705 hPa (never 1706),
+and `limits.airmass_cap_mg(2000)` writes 0.002 kg/stk — the
+`C_M_AIR_CYL_SP_MAX` — Maximum allowed airmass setpoint trap is no longer
+something to remember, because the API has no way to express the mistake.
+
+### Verification (run `R13_20260719-213357`)
+
+- **Byte-identical to R12**: the raw-diff audit reports **0 changed bytes** vs
+  `CB_HSL_SP2933_..._R12.bin`, and the script additionally asserts a full-file
+  comparison. Checksums **CLEAN**; 137 tables read back off the saved bin and
+  matched the journal; switch-patch sanity 123/123 tables resolved and decoded.
+- The audit's allowance is derived from the journal, so this is a real check:
+  an edit made outside the journal would surface as unexplained bytes rather
+  than passing quietly.
+- Locked in as `Code/tests/test_acceptance_tune.py`, which rebuilds R13 and
+  re-compares against the frozen R12 bin, and asserts R13 imports nothing from
+  another revision script.
+
+### Flash and logging gate
+
+**Do not flash R13.** It is the same bytes as the already-reviewed R12; flashing
+it would be a no-op at best. The next revision to flash is R14, which will be
+the first to use this authoring path for an actual calibration change — and it
+inherits the same rule as every revision before it: a starting point, not a
+finished calibration, reviewed by a human before it reaches the car.

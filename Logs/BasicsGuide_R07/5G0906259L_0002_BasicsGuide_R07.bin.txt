@@ -1,0 +1,3 @@
+Flashed bin: 5G0906259L_0002_BasicsGuide_R07.bin (FULL flash).
+Source run: Tunes/TuningBasicsGuide/TUNE_Basics_Guide_out/R07_20260711-223757/
+(byte-identical to R07_20260711-185725; sha256 6a23f7fe829bed2aeeb5a0e203e103407f0477aa per REV_LOG).

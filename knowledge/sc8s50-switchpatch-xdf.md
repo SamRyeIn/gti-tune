@@ -2,7 +2,7 @@
 source: xdf/SC8S50_switchpatch29.33_v1.005.xdf
 date: 2026-07-05
 key_people: none
-key_concepts: curated tuning XDF, switch patch / map switching (multi-map on the fly), TunerPro XDF 1.80 structure, patch-added features (Launch Control/TC/NLS), ECM3 checksum monitoring, base offset 0x200000
+key_concepts: curated tuning XDF, switch patch / map switching (multi-map on the fly), TunerPro XDF 1.80 structure, patch-added features (Launch Control/TC/NLS), per-slot TC enable flags, ECM3 checksum monitoring, base offset 0x200000
 ---
 
 # SC8S50 Switch Patch XDF (v1.005, switchpatch 29.33)
@@ -34,7 +34,7 @@ The defining feature: **on-the-fly map switching**. The BIN is patched so multip
 - **Map Slot 1–5** (`0xF3`–`0xF7`) — five selectable calibration slots.
 - **Switch Patch** (`0xFF`) — the patch's own control tables.
 
-The `29.33` in the filename refers to the switch-patch version this XDF is built to match. **A switch-patched BIN is not stock** — per [[ecu-tuning-basics]], any bin patch (MPI/SWG/HSL/switch) requires a **full flash**, not a CAL-only flash.
+The `29.33` in the filename refers to the switch-patch version this XDF is built to match. **A switch-patched BIN is not stock**: a full flash is required to install or change its ASW/code patch components. Once the ECU is already confirmed to have the same patch set, later calibration-only tune changes may use a CAL flash.
 
 ## Category structure
 
@@ -67,6 +67,46 @@ Features introduced by the patch, beyond stock calibration:
 - Because it's switch-patched, edits land across the map slots — understand which slot a table belongs to before editing.
 - For the Python library, **this curated XDF does not currently load** (see below); the BinToolz definition is the one to use against a switch-patched bin.
 
+## Enabling the patch's traction control (TC) — per-slot flags (2026-07-11)
+
+The switch patch's traction control is enabled **per map slot** via two 1-byte
+flags in the Map Switching group. Both are 8-bit scalars, 0 = off / 1 = on
+(identity `MATH`, declared range 0–1). These tables are patch-added, so they
+have **no A2L symbols** — reference them by title + address. XDF addresses
+below; file offset in the bin = `0x200000 +` address.
+
+| Table            | Meaning                                                        | Slot 1    | Slot 2    | Slot 3    | Slot 4    | Slot 5    |
+|------------------|----------------------------------------------------------------|-----------|-----------|-----------|-----------|-----------|
+| `Enable SL TC`   | Enable the switch-patch's own slip-based traction control      | `0x7D83F` | `0x7D840` | `0x7D841` | `0x7D842` | `0x7D843` |
+| `Disable OEM TC` | Disable the factory ECU-side TC torque intervention (per slot) | `0x7D83A` | `0x7D83B` | `0x7D83C` | `0x7D83D` | `0x7D83E` |
+
+Typical use: for the slot you drive, set `Enable SL TC` = 1 and decide whether
+to also set `Disable OEM TC` = 1 so the two systems don't fight. "OEM TC" can
+only mean the ECU's torque-intervention side — the ABS/ESC module's brake-based
+intervention is a separate controller a CAL flag can't touch.
+
+**What the SL TC is:** a slip-based PID controller intervening via **ignition
+retard and wastegate**. Its behavior tables live in the **TC** category
+(`0xF8`): `Slip target straight`, `Slip wheel angle multiplier`, `Threshold
+increase on sustained slip`, PID P/I/D weights and clamps, `Slip ignition
+weight` / `Slip WG weight` (intervention per kph of slip), `Minimum timing`,
+and `SCC Threshold` / `SCC duration`. Review the defaults before relying on it.
+
+Caveats:
+
+- Flags only exist on a **switch-patched** bin (patch 29.33 via
+  [[bintoolz-btp-patching]] / `simoscal.btp`; correct `CAL_CRC` after apply;
+  full flash to install or change the patch, CAL flash for later matching-patch
+  tune changes). On a stock/unpatched bin these addresses are not TC flags.
+- For scripted edits use BinToolz's `S50 Switch Patch.29.33.V2.xdf` (see the
+  loading section below); the curated `v1.005`/`v1.006` fail to load under
+  `simoscal`. Both XDFs agree on all ten addresses and per-slot category
+  membership — a useful cross-check.
+- Provenance: addresses, slot mapping, and 0/1 range verified directly from
+  both XDF files (2026-07-11); runtime behavior comes from the XDF table
+  descriptions. The exact runtime interplay of `Enable SL TC` vs
+  `Disable OEM TC` is **not verified** — needs testing or upstream docs.
+
 ## Which XDF loads under `simoscal` (BTP-adapter U1, 2026-07-10)
 
 Resolved offline while building the BTP patching adapter (see
@@ -87,5 +127,69 @@ non-z `XDFAXIS` whose `<EMBEDDEDDATA>` has no `mmedaddress` is a TunerPro
 `mmedmajorstridebits="-32"`); the parser now treats it as a label axis rather than
 raising. The default `SC8S50.V1.0.xdf` has none of these, so that fix is
 behavior-preserving there.
+
+## The 24 per-slot tables — what actually differs between map slots (2026-07-13)
+
+Enumerated from `S50 Switch Patch.29.33.V2.xdf` by parsing `CATEGORYMEM`
+references: each of the five slot categories (`Map Slot 1`–`Map Slot 5`,
+`0xF7`→`0xF3`) carries an **identical set of 24 tables**. Those 24 are exactly
+the parameters that can differ from slot to slot; everything else (the OEM
+airflow / boost / timing / fuel calibration) is **shared across all slots**.
+These are patch-added, so they have **no A2L IDs** — reference by title.
+
+| Group          | Tables (per slot)                                                                                                                       |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| Limits         | `RPM limiter`, `Speed limiter`                                                                                                           |
+| Core offsets   | `PUT setpoint` (boost target), `Lambda modifier`, `Spark modifier`, `Pops enable`                                                       |
+| Torque request | `Torque Request AT Type 1/2/3` (DSG), `Torque Request MT Type 1/2` (manual)                                                              |
+| Flex-fuel enab | `Enable flex fuel spark / PUT / lambda / TQ / IAT / MPI modifier` (0/1 each)                                                             |
+| Feature enab   | `Enable RAL`, `Enable NLS`, `Enable LC`, `Enable SL TC`, `Disable OEM TC` (0/1 each — see per-slot flag addresses above)                 |
+| Other          | `Manual AFU`, `Gauge settings (bitmask)`                                                                                                 |
+
+**Not per-slot:** the `Switch Patch` (`0xFF`) category holds the **global**
+behavior internals shared by every slot — the SL-TC PID controller (`Slip
+target straight`, `Slip WG weight`, `PID I/D weight`, `Minimum timing`, `SCC
+Threshold`…), Launch Control config (`Target RPM`, `Timing during PU`…), RAL,
+NLS, and the knock-blink-MIL tables. The `Map Switching` (`0xFB`) category is
+just the union of all five slots' copies plus `UI button` and the shared
+`PUT SP RPM Axis`. So switching gives independent rev/speed limits, boost
+target, timing/lambda trims, torque-request shape, and per-slot feature on/off
+flags — over a single shared tune of each feature's internals and the OEM base.
+
+## PUT setpoint: switch-patch table vs stock `IP_PUT_SP` (2026-07-13)
+
+Compared the switch patch's per-slot `PUT setpoint` against stock `IP_PUT_SP`
+— Pressure up throttle setpoint (`uniqueid 0x1b6e2`, category Boost). The patch
+gives a **4× denser, editable, per-slot** boost-target grid at the **same
+per-cell precision and ceiling** — better *shaping*, not more commandable boost.
+
+| Aspect             | Stock `IP_PUT_SP`                                 | Switch-patch `PUT setpoint`                         |
+|--------------------|---------------------------------------------------|-----------------------------------------------------|
+| Grid               | 6 × 4 = 24 cells                                   | 12 × 8 = 96 cells (**4×**)                           |
+| X = RPM            | 6 bkpts, 0–8160 rpm, 16-bit (axis `0x2fd2`)        | 12 bkpts, 16-bit, **breakpoints editable** ¹        |
+| Y = load           | 4 bkpts, hPa, 16-bit (`ldp_map_sp_ip_put_sp`, `0x2ee4`) | 8 bkpts, 8-bit (axis `0xC836`) ²              |
+| Z = PUT target     | 16-bit, hPa, `/12.06`, max 5434 hPa               | 16-bit, hPa, `/12.06`, max 5434 hPa — **same**      |
+| Scope              | one global table                                  | **5 independent copies** (z `0x7D41A`/`4DA`/`59A`/`65A`/`71A`) |
+
+¹ RPM breakpoints are the patch-added `PUT SP RPM Axis` (`0x7D7DC`, 12 pts) +
+`PUT SP RPM Axis Header` — stock doesn't easily expose these. The five slots
+share this one X axis (and the `0xC836` Y axis); only the z grid is per-slot.
+
+² The patch Y axis has identity `MATH`, no declared `units`, and `0xC836`
+overlaps an unrelated stock region — so its physical quantity/range is **not
+established from the XDF alone**; read its 8 breakpoint values from the bin to
+interpret. Likely the load / requested-pressure dimension analogous to stock Y,
+but **unconfirmed**.
+
+**Bottom line:** the patch table doesn't raise the boost ceiling (both cap at
+5434 hPa absolute) or per-cell resolution (both 16-bit hPa) — it lets you shape
+the target far more finely across RPM/load and vary it per slot. Two things
+inferred, **not code-verified**: (a) the Y-axis quantity (see ²), and (b)
+whether the patch fully overrides the OEM `IP_PUT_SP` lookup for the active slot
+vs. feeds the OEM chain — the absolute-hPa, per-slot structure implies override,
+but the runtime routing wasn't traced.
+
+Provenance: structures parsed directly from `S50 Switch Patch.29.33.V2.xdf` and
+`SC8S50.V1.0.xdf` (2026-07-13).
 
 Related: [[bintoolz-btp-patching]], [[ecu-tuning-basics]], [[tuning-getting-started]], [[xdf-bin-library-requirements]]

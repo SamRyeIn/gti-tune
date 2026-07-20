@@ -77,13 +77,16 @@ against the switch-patch XDF (slot tables decode plausibly).
 
 Questions 1–2 were **resolved offline** during the BTP-adapter U1 investigation
 (2026-07-10) against a copy of the stock bin; see the "U1 findings" section below.
-Questions 3–4 remain future work (on-car / flash procedure).
+Question 3 remains future work. Question 4 is resolved from the established
+in-car flash procedure.
 
 3. **Switching procedure** — how slots are selected/configured in practice
    (cruise-stalk actuation, slot defaults); possibly covered by the not-yet-
    ingested `Docs/4. ECU Tuning - Not the Basics.docx`.
-4. A switch-patched bin **requires a full flash** (not CAL-only) per
-   [[ecu-tuning-basics]] — plan the flash procedure accordingly.
+4. **Flash mode for a switch-patched bin** — a full flash installs or changes
+   the ASW/code patch components. After the ECU is confirmed to have the same
+   patch set, later calibration-only tune updates may use a CAL flash; do not
+   use CAL-only to introduce or upgrade a patch.
 
 Note: per `Troubleshooting/CheckEngine/20260710_Troubleshooting.txt`, tuning is
 paused until the DSG electrical faults are diagnosed — flashing is future work.

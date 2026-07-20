@@ -16,6 +16,9 @@ Boot reading order for a fresh session, before doing tuning work:
 3. `Code/README.md` — the `simoscal` API, workflow diagram, safety model.
 4. The active tune's `REV_LOG.md` (e.g. `Tunes/TuningBasicsGuide/REV_LOG.md`)
    and the latest `Logs/<Tune>_R<rev>/log_review.md` — current tune state.
+5. The active tune's `README_NEXT_STEPS.md` (e.g.
+   `Tunes/TuningBasicsGuide/README_NEXT_STEPS.md`) — the pre-work idea queue for
+   upcoming revisions (what to change next, before it's scripted).
 
 ## Folder structure
 
@@ -52,7 +55,8 @@ Notes:
   stock bin, `xdf/` definitions, `oracles/` captured TunerPro exports (test
   fixtures). XDFs must match the bin's SC8S50 file structure.
 - A `Tunes/<Tune>/` project holds revisioned `TUNE_<Tune>_R<rev>.py` scripts,
-  `REV_LOG.md`, and `<Tune>_out/R<rev>_<timestamp>/` run outputs (saved bin,
+  `REV_LOG.md`, a `README_NEXT_STEPS.md` (living pre-work idea queue for upcoming
+  revisions), and `<Tune>_out/R<rev>_<timestamp>/` run outputs (saved bin,
   `report.md`, `compare/` PNGs). `Tunes/TuningBasicsGuide/Test/` holds
   other-model comparison runs — reference only, not part of the lineage.
 - A `Logs/<Tune>_R<rev>/` folder holds the raw `simostools-*.csv` logs Sam
@@ -64,24 +68,43 @@ Notes:
 
 Tuning is iterative, and each pass through the loop looks like this:
 
-1. **Revise** — Claude writes the next tune revision as a new script
+1. **Revise** — write the next tune revision as a new script
    `Tunes/<Tune>/TUNE_<Tune>_R<NN>.py` (revision-by-separate-file pattern: new
    file per revision, cumulative header history, `REV_LOG.md` entry — per the
    global revision-tracking instructions). Running it produces a timestamped
    output folder `<Tune>_out/R<NN>_<timestamp>/` containing the saved `.bin`,
    `report.md`, and before/after `compare/` PNGs.
-2. **Verify** — prove the revision changed only the intended tables
-   (checksums CLEAN, `cal.unique_tables()` value-compare against the previous
-   revision's bin; see the `tune-bin-verification` memory). Human review gate:
-   Sam visually reviews the report and PNGs before flashing.
+
+   **From R13 on, revisions are written in the `simoscal.tune` API**: copy the
+   previous revision, edit the domain calls, run it. A revision is one flat
+   self-contained script — it NEVER imports from another revision script (R00–R12
+   did, and are frozen history). Start from
+   `Tunes/TuningBasicsGuide/TUNE_Basics_Guide_R13.py` as the template and
+   `Code/docs/authoring-a-revision.md` as the guide. Sam authors these too, so
+   keep them readable: physical units, an `intent=` on every call, and the
+   calibration's values as named constants at the top.
+2. **Verify** — prove the revision changed only the intended tables. `build()`
+   now owns this: checksums corrected + independently verified, every journaled
+   table read back off the saved file, and a byte-level audit against the
+   previous revision's bin whose allowance is derived from the edit journal, so
+   an undeclared change fails the build rather than passing quietly. Pass
+   `reference_bin=` or that last gate does not run. (Pre-R13 revisions did this
+   by hand — see the `tune-bin-verification` memory.) Human review gate: Sam
+   visually reviews the report and PNGs before flashing.
 3. **Flash** — human step. Sam flashes the bin to the car with the SimosTools
    Android app. Claude cannot do this.
 4. **Log** — human step. Sam drives (e.g. 3rd-gear WOT pulls), logs with
    SimosTools, and drops the CSVs into a new `Logs/<Tune>_R<NN>/` folder.
-5. **Review** — Claude analyzes the logs: writes `log_review.md` in that folder
-   (findings ranked High/Medium/Low with evidence plots from a `plot_log_review.py`
-   script), checking knock, boost tracking, lambda, fuel pressure, turbo/temps.
-   Check the gear-indexing rule below and the PID list before interpreting channels.
+5. **Review** — Claude analyzes the logs. First run the analysis battery
+   (`python -m simoscal.analysis Logs/<Tune>_R<NN>` or `analyze_folder()`), which
+   writes `analysis_findings.{json,md}`, evidence plots, and per-table coverage
+   maps into the folder — an identical, enumerable, deterministic set of checks
+   with an explicit SKIPPED list. Then Claude reads that output and **writes
+   `log_review.md`** (findings ranked High/Medium/Low with evidence plots),
+   checking knock, boost tracking, lambda, fuel pressure, turbo/temps. The tool
+   is findings-only — it never writes `log_review.md` and never proposes a
+   calibration change; authorship and judgment stay with Claude. Check the
+   gear-indexing rule below and the PID list before interpreting channels.
 6. Findings feed the next revision → back to step 1.
 
 Every tune revision is "a starting point, not a finished calibration" — never
