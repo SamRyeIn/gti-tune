@@ -210,6 +210,12 @@ SLOT_CURVES = {
     4: SLOT_CONSERVATIVE,     # same as slot 1
     # slot 5 is the valet cap, declared in psi so the library floors it
 }
+SLOT_LABELS = {
+    1: "conservative",
+    2: "intermediate",
+    3: "aggressive — the former R09/R10 shelf",
+    4: "conservative, same as slot 1",
+}
 
 SUMMARY = """\
 R13 makes **no calibration change**. It reproduces the R12 bin byte for byte
@@ -224,42 +230,88 @@ def declare(tune: Tune) -> None:
     """The complete R00–R12 calibration, in the order the ECU layers it."""
     # -- Fueling: axes first, so the guide's grid lands on the loads it was
     #    authored for, then the recipe can write HPDI/MPI without mismatching.
-    tune.fueling.rebreakpoint_lambda_axes(rpm=LAMBDA_RPM, load=LAMBDA_LOAD)
+    tune.fueling.rebreakpoint_lambda_axes(
+        rpm=LAMBDA_RPM, load=LAMBDA_LOAD,
+        intent="re-breakpoint lambda axes onto the loads the enrichment grid was authored for",
+    )
     tune.fueling.lambda_grid(
-        LAMBDA_CELLS, rpm_keys=LAMBDA_RPM, load_keys=LAMBDA_LOAD
+        LAMBDA_CELLS, rpm_keys=LAMBDA_RPM, load_keys=LAMBDA_LOAD,
+        intent="basic lambda enrichment map from the tuning guide (0.80 under high load)",
     )
 
     # -- The whole ecu-tuning-basics SOP, journaled per table.
     tune.apply_basics_sop()
 
     # -- Fueling and limiter values the recipe leaves at stock.
-    tune.fueling.pedal_threshold(PEDAL_THRESHOLD_PCT)
-    tune.boost.manifold_pressure_max(MANIFOLD_PRESSURE_MAX_HPA)
-    tune.limits.intake_air_max(INTAKE_AIR_MAX_MG)
-    tune.limits.torque_reference_max(TORQUE_REFERENCE_MAX_NM)
-    tune.limits.airmass_cap_mg(AIRMASS_CAP_MG)
-    tune.fueling.lambda_floors(LAMBDA_FLOOR)
+    tune.fueling.pedal_threshold(
+        PEDAL_THRESHOLD_PCT,
+        intent="drop full-load pedal threshold to ~72% so heavy throttle reaches full-load fueling",
+    )
+    tune.boost.manifold_pressure_max(
+        MANIFOLD_PRESSURE_MAX_HPA,
+        intent="raise the requested-IMP ceiling well clear so it never clamps the tune",
+    )
+    tune.limits.intake_air_max(
+        INTAKE_AIR_MAX_MG,
+        intent="raise both max-intake-air-per-stroke tables to 2000 mg/stk",
+    )
+    tune.limits.torque_reference_max(
+        TORQUE_REFERENCE_MAX_NM,
+        intent="lift the reference-torque monitor ceiling above the tune's crank torque",
+    )
+    tune.limits.airmass_cap_mg(
+        AIRMASS_CAP_MG,
+        intent="raise the airmass-setpoint cap to 2000 mg/stk (stored kg/stk, see the API)",
+    )
+    tune.fueling.lambda_floors(
+        LAMBDA_FLOOR,
+        intent="set the three lambda enrichment floors to 0.80 to permit the map's enrichment",
+    )
 
     # -- Ignition: the measured knock pockets, on all nine cam-position grids.
-    tune.ignition.retard_cells(TIMING)
+    tune.ignition.retard_cells(
+        TIMING,
+        intent="pull timing at the R01/R04 measured knock pockets, blended so there is no cliff",
+    )
 
     # -- Wastegate: unclamp the top of the map, then the two log-driven overlays.
-    tune.wastegate.exh_flow_axis_last(EXH_FLOW_AXIS_TOP)
+    tune.wastegate.exh_flow_axis_last(
+        EXH_FLOW_AXIS_TOP,
+        intent="extend the exhaust-flow axis top to 1.40 (logged flow reaches ~1.33)",
+    )
     tune.wastegate.overlay(WG_DELTAS_R05, intent="R05 overboost-ridge overlay")
     tune.wastegate.overlay(WG_DELTAS_R08, intent="R08 top-end deepening")
 
     # -- Boost: P0234 margin, then park the base ceiling on the R09 axis.
-    tune.boost.overboost_threshold(OVERBOOST_THRESHOLD_HPA)
-    tune.boost.put_rpm_axis(PUT_RPM_AXIS)
-    tune.boost.put_ceiling_psi(BASE_CEILING_PSI, rounding="nearest")
-    tune.boost.pressure_quotient_max(PQ_PLATEAU, low_rpm=PQ_LOW_RPM)
+    tune.boost.overboost_threshold(
+        OVERBOOST_THRESHOLD_HPA,
+        intent="raise the P0234 overboost diagnosis threshold to give the tune margin",
+    )
+    tune.boost.put_rpm_axis(
+        PUT_RPM_AXIS,
+        intent="re-breakpoint the PUT-setpoint rpm axis onto the R09 grid",
+    )
+    tune.boost.put_ceiling_psi(
+        BASE_CEILING_PSI, rounding="nearest",
+        intent="park the non-binding base PUT ceiling at 30 psi above every selectable slot",
+    )
+    tune.boost.pressure_quotient_max(
+        PQ_PLATEAU, low_rpm=PQ_LOW_RPM,
+        intent="shape the compressor pressure-quotient cap (3.1 plateau above 1.70)",
+    )
 
     # -- Switch patch: shared axis, the four tuned slots, then the valet cap.
     #    Every slot sits below the parked base ceiling, which is what makes the
     #    parked ceiling safe.
-    tune.switchpatch.slot_rpm_axis(SLOT_RPM_AXIS)
+    tune.switchpatch.slot_rpm_axis(
+        SLOT_RPM_AXIS,
+        intent="set the shared switch-patch slot rpm axis to the fine 12-point grid",
+    )
     for slot, curve in SLOT_CURVES.items():
-        tune.switchpatch.slot_curve(slot, hpa=curve, require_as_patched=True)
+        tune.switchpatch.slot_curve(
+            slot, hpa=curve, require_as_patched=True,
+            intent=f"switch-patch slot {slot} boost curve ({SLOT_LABELS[slot]})",
+        )
     tune.switchpatch.slot_curve(
         VALET_SLOT, psi=VALET_CAP_PSI, require_as_patched=True,
         intent=f"valet map: never above {VALET_CAP_PSI:g} psi gauge",
@@ -267,7 +319,9 @@ def declare(tune: Tune) -> None:
 
     # -- Traction control: the patch's own on all five slots, factory TC off so
     #    the two do not fight.
-    tune.switchpatch.traction_control()
+    tune.switchpatch.traction_control(
+        intent="enable the patch's own traction control on all slots, factory TC off",
+    )
 
     # -- A gate build() runs on the finished file.
     tune.switchpatch.require_sanity(stock_bin=BIN_PATH)
