@@ -1,0 +1,6 @@
+# Generated promo build products — reproducible from the scripts + real outputs.
+frames/
+assets/
+*.mp4
+__pycache__/
+.pytest_cache/
