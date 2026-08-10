@@ -123,6 +123,10 @@ def total_duration_s() -> float:
 
 # ----------------------------------------------------------------- asset lookup
 
+CODE_ROOT = REPO_ROOT / "Code"                 # the simoscal library (its own repo)
+XDF_PATH = CODE_ROOT / "xdf" / "SC8S50.V1.0.xdf"
+STOCK_BIN = CODE_ROOT / "bin" / "5G0906259L__0002.bin"
+
 TUNE_DIR = REPO_ROOT / "Tunes" / "TuningBasicsGuide"
 TUNE_OUT_ROOT = TUNE_DIR / "TUNE_Basics_Guide_out"
 LOGS_ROOT = REPO_ROOT / "Logs"
