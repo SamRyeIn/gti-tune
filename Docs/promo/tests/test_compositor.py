@@ -148,15 +148,35 @@ def test_fit_scales_into_the_box():
 # --------------------------------------------------------------- frame writer
 
 def test_frame_writer_numbers_frames_and_enforces_beat_windows(tmp_path):
-    beat = config.BEATS["title"]
+    beat = config.Beat("stub", 0.0, 6 / config.FPS, "short stand-in beat")
     w = C.FrameWriter(tmp_path)
     w.begin(beat)
     for _ in range(beat.n_frames):
         w.write(C.Frame())
     w.end(beat)
     written = sorted(tmp_path.glob("frame_*.png"))
-    assert len(written) == beat.n_frames == config.frames_for("title")
+    assert len(written) == beat.n_frames == 6
     assert written[0].name == "frame_00000.png"
+    assert written[-1].name == "frame_00005.png"
+    assert config.frames_for("title") == config.BEATS["title"].n_frames
+
+
+def test_raw_pipe_sink_emits_exactly_one_frame_of_rgb_bytes():
+    class Buf:
+        def __init__(self):
+            self.chunks = []
+
+        def write(self, b):
+            self.chunks.append(b)
+
+        def close(self):
+            self.closed = True
+
+    buf = Buf()
+    w = C.FrameWriter(C.RawPipeSink(buf))
+    w.write(C.Frame())
+    assert len(buf.chunks) == 1
+    assert len(buf.chunks[0]) == config.WIDTH * config.HEIGHT * 3
 
 
 def test_frame_writer_rejects_a_short_beat(tmp_path):

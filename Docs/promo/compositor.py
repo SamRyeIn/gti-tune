@@ -67,6 +67,24 @@ def pulse(t: float) -> float:
     return math.sin(math.pi * clamp01(t))
 
 
+def keyframe(t: float, points: list[tuple[float, float]], ease=None) -> float:
+    """Piecewise-eased value over `(time, value)` keyframes, times in 0..1.
+
+    Repeating a value across two keyframes holds it still — that is how the
+    report pan pauses on the sections worth reading.
+    """
+    ease = ease or ease_in_out
+    t = clamp01(t)
+    if t <= points[0][0]:
+        return points[0][1]
+    for (t0, v0), (t1, v1) in zip(points, points[1:]):
+        if t <= t1:
+            span = t1 - t0
+            local = 1.0 if span <= 0 else (t - t0) / span
+            return lerp(v0, v1, ease(local))
+    return points[-1][1]
+
+
 # ----------------------------------------------------------------------- fonts
 
 
@@ -81,6 +99,49 @@ def font(size: int, mono: bool = False, italic: bool = False) -> ImageFont.FreeT
     if not Path(path).is_file():
         path = config.FONT_FALLBACK
     return ImageFont.truetype(str(path), size)
+
+
+def _line_width(line: str, fnt: ImageFont.FreeTypeFont, tracking: float) -> float:
+    if not tracking:
+        return fnt.getlength(line)
+    return sum(fnt.getlength(ch) + tracking for ch in line) - tracking if line else 0.0
+
+
+@lru_cache(maxsize=512)
+def _text_layer(s: str, size: int, mono: bool, italic: bool, max_width: float | None,
+                line_spacing: float, bold: bool, tracking: float, color: Color,
+                align: str = "left") -> tuple[Image.Image, float, float, int]:
+    """Rasterise a text block once: `(alpha layer, block width, height, pad)`.
+
+    The layer is drawn `pad` px in from its own top-left so strokes and glyph
+    overhang have room; callers paste it at `(left - pad, top - pad)`.
+    """
+    fnt = font(size, mono=mono, italic=italic)
+    lines = wrap_text(s, fnt, max_width) if max_width else s.split("\n")
+    widths = [_line_width(line, fnt, tracking) for line in lines]
+    block_w = max(widths) if widths else 0.0
+    line_h = size * line_spacing
+    total_h = line_h * len(lines)
+
+    pad = max(6, round(size * 0.4))
+    layer = Image.new("RGBA", (math.ceil(block_w) + 2 * pad, math.ceil(total_h) + 2 * pad),
+                      (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    stroke = round(size * 0.022) if bold else 0
+    for i, line in enumerate(lines):
+        lx = pad + {"left": 0.0, "center": (block_w - widths[i]) / 2,
+                    "right": block_w - widths[i]}[align]
+        ly = pad + i * line_h
+        if tracking:
+            cx = lx
+            for ch in line:
+                d.text((cx, ly), ch, font=fnt, fill=color,
+                       stroke_width=stroke, stroke_fill=color)
+                cx += fnt.getlength(ch) + tracking
+        else:
+            d.text((lx, ly), line, font=fnt, fill=color,
+                   stroke_width=stroke, stroke_fill=color)
+    return layer, block_w, total_h, pad
 
 
 def wrap_text(text: str, fnt: ImageFont.FreeTypeFont, max_width: float) -> list[str]:
@@ -122,13 +183,38 @@ def fit(img: Image.Image, max_w: float | None = None, max_h: float | None = None
     return img.resize((max(round(img.width * s), 1), max(round(img.height * s), 1)), Image.LANCZOS)
 
 
+@lru_cache(maxsize=64)
+def _round_mask(size: tuple[int, int], radius: int) -> Image.Image:
+    mask = Image.new("L", size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, size[0] - 1, size[1] - 1],
+                                           radius=radius, fill=255)
+    return mask
+
+
+@lru_cache(maxsize=64)
+def _shadow_mask(size: tuple[int, int], radius: int, pad: int, blur: int) -> Image.Image:
+    w, h = size
+    sh = Image.new("L", (w + pad * 2, h + pad * 2), 0)
+    ImageDraw.Draw(sh).rounded_rectangle([pad, pad + 8, pad + w, pad + h + 8],
+                                         radius=radius, fill=150)
+    return sh.filter(ImageFilter.GaussianBlur(blur))
+
+
+@lru_cache(maxsize=8)
+def _vignette_overlay(size: tuple[int, int], strength: float) -> Image.Image:
+    """A black edge-darkening layer, pre-blurred once and pasted per frame."""
+    mask = Image.new("L", size, 0)
+    inset = round(min(size) * 0.06)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [inset, inset, size[0] - inset, size[1] - inset], radius=inset * 3, fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(inset))
+    return mask.point(lambda v: round((255 - v) * strength))
+
+
 def rounded(img: Image.Image, radius: int = 18) -> Image.Image:
     """Round the corners of an image, returning RGBA with a soft alpha edge."""
     out = img.convert("RGBA")
-    mask = Image.new("L", out.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, out.size[0] - 1, out.size[1] - 1],
-                                          radius=radius, fill=255)
-    out.putalpha(mask)
+    out.putalpha(_round_mask(out.size, radius))
     return out
 
 
@@ -198,6 +284,10 @@ class Frame:
         self.size = self.size or (config.WIDTH, config.HEIGHT)
         self.img = Image.new("RGB", self.size, self.bg or config.PALETTE["bg"])
         self.draw = ImageDraw.Draw(self.img)
+        # Every visible string drawn on this frame, in draw order. Cheap to
+        # keep, and it lets the tests assert that a beat actually says the
+        # thing it is required to say (e.g. the human-flash line).
+        self.drawn_text: list[str] = []
 
     # -- geometry helpers
     @property
@@ -263,52 +353,29 @@ class Frame:
         """Draw (optionally wrapped) text; returns its bounding box.
 
         `tracking` adds per-character letter spacing, used for the small
-        all-caps labels. Returns a zero box when fully transparent.
+        all-caps labels. Returns a zero box when fully transparent. The glyphs
+        are rasterised once per unique string+style and cached, because most
+        frames redraw the same caption at a different opacity.
         """
-        if clamp01(alpha) <= 0.0:
+        alpha = clamp01(alpha)
+        if alpha <= 0.0:
             return (0, 0, 0, 0)
-        fnt = font(size, mono=mono, italic=italic)
-        col = config.PALETTE[color] if isinstance(color, str) else color
-        if alpha < 1.0:
-            bg = config.PALETTE["bg"]
-            col = tuple(round(lerp(b, c, alpha)) for b, c in zip(bg, col))
+        self.drawn_text.append(s)
+        col = config.PALETTE[color] if isinstance(color, str) else tuple(color)
 
-        lines = wrap_text(s, fnt, max_width) if max_width else s.split("\n")
-        line_h = size * line_spacing
-        total_h = line_h * len(lines)
+        layer, block_w, total_h, pad = _text_layer(
+            s, size, mono, italic, max_width, line_spacing, bold, tracking, col, align)
 
         x, y = xy
         y0 = {"top": y, "middle": y - total_h / 2, "bottom": y - total_h}[valign]
+        left = {"left": x, "center": x - block_w / 2, "right": x - block_w}[align]
 
-        stroke = round(size * 0.022) if bold else 0
-        widths = [self._line_width(line, fnt, tracking) for line in lines]
-        left = min(
-            {"left": x, "center": x - w / 2, "right": x - w}[align] for w in widths
-        ) if widths else x
-        right = max(
-            {"left": x + w, "center": x + w / 2, "right": x}[align] for w in widths
-        ) if widths else x
-
-        for i, line in enumerate(lines):
-            lw = widths[i]
-            lx = {"left": x, "center": x - lw / 2, "right": x - lw}[align]
-            ly = y0 + i * line_h
-            if tracking:
-                cx = lx
-                for ch in line:
-                    self.draw.text((cx, ly), ch, font=fnt, fill=col,
-                                   stroke_width=stroke, stroke_fill=col)
-                    cx += fnt.getlength(ch) + tracking
-            else:
-                self.draw.text((lx, ly), line, font=fnt, fill=col,
-                               stroke_width=stroke, stroke_fill=col)
-        return (round(left), round(y0), round(right), round(y0 + total_h))
-
-    @staticmethod
-    def _line_width(line: str, fnt: ImageFont.FreeTypeFont, tracking: float) -> float:
-        if not tracking:
-            return fnt.getlength(line)
-        return sum(fnt.getlength(ch) + tracking for ch in line) - tracking if line else 0.0
+        mask = layer.split()[3]
+        if alpha < 1.0:
+            mask = mask.point(lambda v: round(v * alpha))
+        self.img.paste(Image.new("RGB", layer.size, col),
+                       (round(left - pad), round(y0 - pad)), mask)
+        return (round(left), round(y0), round(left + block_w), round(y0 + total_h))
 
     def rect(self, box: Rect, fill: Color | str | None = None,
              outline: Color | str | None = None, width: int = 2, radius: int = 0) -> None:
@@ -335,11 +402,9 @@ class Frame:
                              Image.LANCZOS)
         if shadow and alpha > 0.05:
             pad = 30
-            sh = Image.new("L", (img.width + pad * 2, img.height + pad * 2), 0)
-            ImageDraw.Draw(sh).rounded_rectangle(
-                [pad, pad + 8, pad + img.width, pad + img.height + 8],
-                radius=radius, fill=round(150 * clamp01(alpha)))
-            sh = sh.filter(ImageFilter.GaussianBlur(16))
+            sh = _shadow_mask(img.size, radius, pad, 16)
+            if alpha < 1.0:
+                sh = sh.point(lambda v: round(v * alpha))
             shadow_img = Image.new("RGB", sh.size, (0, 0, 0))
             box_probe = self._anchor_box(img.size, xy, anchor)
             self.img.paste(shadow_img, (box_probe[0] - pad, box_probe[1] - pad), sh)
@@ -366,15 +431,8 @@ class Frame:
         """Darken the edges slightly so bright screenshots sit in the frame."""
         if strength <= 0:
             return
-        mask = Image.new("L", self.size, 0)
-        d = ImageDraw.Draw(mask)
-        inset = round(min(self.size) * 0.06)
-        d.rounded_rectangle([inset, inset, self.w - inset, self.h - inset],
-                            radius=inset * 3, fill=255)
-        mask = mask.filter(ImageFilter.GaussianBlur(inset))
-        dark = Image.new("RGB", self.size, (0, 0, 0))
-        self.img = Image.composite(self.img, Image.blend(self.img, dark, strength), mask)
-        self.draw = ImageDraw.Draw(self.img)
+        self.img.paste(Image.new("RGB", self.size, (0, 0, 0)), (0, 0),
+                       _vignette_overlay(self.size, round(clamp01(strength), 3)))
 
     def fade_to(self, color: Color | str, amount: float) -> None:
         """Blend the whole canvas toward a colour — used for beat in/out dips."""
@@ -392,17 +450,52 @@ class Frame:
 # ---------------------------------------------------------------- frame writer
 
 
+class PngSink:
+    """Numbered PNGs on disk — inspectable, but ~0.5 s a frame to encode."""
+
+    def __init__(self, out_dir: Path, pattern: str = "frame_%05d.png",
+                 compress_level: int = 1) -> None:
+        self.out_dir = Path(out_dir)
+        self.out_dir.mkdir(parents=True, exist_ok=True)
+        self.pattern = pattern
+        self.compress_level = compress_level
+
+    def write(self, img: Image.Image, index: int) -> Path:
+        path = self.out_dir / (self.pattern % index)
+        img.save(path, compress_level=self.compress_level)
+        return path
+
+    def close(self) -> None:
+        pass
+
+
+class RawPipeSink:
+    """Raw RGB straight into ffmpeg's stdin — ~20x faster than writing PNGs.
+
+    The whole promo is ~2700 frames; at PNG speed the encode step alone costs
+    half an hour, which makes iterating on a scene painful.
+    """
+
+    def __init__(self, stream) -> None:
+        self.stream = stream
+
+    def write(self, img: Image.Image, index: int) -> None:
+        self.stream.write(img.tobytes())
+
+    def close(self) -> None:
+        self.stream.close()
+
+
 class FrameWriter:
-    """Writes numbered frames and enforces that beats tile the timeline exactly.
+    """Feeds frames to a sink and enforces that beats tile the timeline exactly.
 
     A scene that renders too few or too many frames fails here, before the
     encode, rather than silently shifting every later beat.
     """
 
-    def __init__(self, out_dir: Path, pattern: str = "frame_%05d.png") -> None:
-        self.out_dir = Path(out_dir)
-        self.out_dir.mkdir(parents=True, exist_ok=True)
-        self.pattern = pattern
+    def __init__(self, sink) -> None:
+        # A bare path is the common case in tests and for `--frames` debugging.
+        self.sink = PngSink(sink) if isinstance(sink, (str, Path)) else sink
         self.index = 0
         self.count = 0
         self._beat = None
@@ -423,7 +516,7 @@ class FrameWriter:
             )
         self._beat = None
 
-    def write(self, frame: Frame | Image.Image) -> Path:
+    def write(self, frame: Frame | Image.Image):
         img = frame.img if isinstance(frame, Frame) else frame
         if img.size != (config.WIDTH, config.HEIGHT):
             raise AssertionError(f"frame is {img.size}, expected {(config.WIDTH, config.HEIGHT)}")
@@ -432,8 +525,10 @@ class FrameWriter:
                 f"beat '{self._beat.id}' tried to write past its window "
                 f"(frame {self.index} >= {self._beat.end_frame})"
             )
-        path = self.out_dir / (self.pattern % self.index)
-        img.convert("RGB").save(path)
+        out = self.sink.write(img.convert("RGB"), self.index)
         self.index += 1
         self.count += 1
-        return path
+        return out
+
+    def close(self) -> None:
+        self.sink.close()

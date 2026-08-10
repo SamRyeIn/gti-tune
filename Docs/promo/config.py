@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 # ---------------------------------------------------------------- canvas / time
@@ -170,6 +171,7 @@ def newest_log_plots_dir(root: Path = LOGS_ROOT) -> Path:
     return max(candidates, key=lambda p: _rev_sort_key(p.parent))
 
 
+@lru_cache(maxsize=1)
 def resolve_assets() -> dict[str, Path]:
     """Absolute source paths for every real asset the promo draws from.
 
@@ -191,6 +193,7 @@ def resolve_assets() -> dict[str, Path]:
         "log_rail": plots / "analysis_rail_pressure.png",
         "log_boost": plots / "analysis_boost.png",
         "log_coverage": plots / "analysis_coverage_IP_FAC_BPA_SP_0.png",
+        "findings_md": plots.parent / "analysis_findings.md",
         "tune_script": TUNE_DIR / "TUNE_Basics_Guide_R14.py",
     }
 
