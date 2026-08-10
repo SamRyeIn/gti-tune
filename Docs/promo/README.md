@@ -19,6 +19,39 @@ Output: `Docs/promo/simoscal_promo.mp4`. Intermediates (`frames/`, `assets/`,
 the `.mp4`) are gitignored — the scripts plus the real output folders are the
 record.
 
+Useful while iterating:
+
+```bash
+python3 Docs/promo/build_promo.py --only logs   # one beat -> preview_logs.mp4
+python3 Docs/promo/build_promo.py --frames      # keep numbered PNGs in frames/
+python3 Docs/promo/scenes.py out/               # still frames of every beat
+python3 Docs/promo/scene_surface.py out/        # stills of the hero beat
+python3 -m pytest Docs/promo/tests -q           # ~90 s
+```
+
+Frames are piped to ffmpeg as raw RGB by default; `--frames` writes numbered
+PNGs instead (inspectable, but far slower). A full build took ~40 min on a
+heavily loaded machine (~2400 s of render for 2700 frames); the hero surface
+beat is the most expensive at ~1.6 s a frame.
+
+## What the build proves
+
+`build_promo.py` will not produce a file it cannot vouch for:
+
+- every prepared asset must exist before rendering starts;
+- `FrameWriter` fails if a beat renders the wrong number of frames or writes
+  outside its window, so a gap or overlap stops the build before the encode;
+- the encoded file is probed with `ffprobe` and checked for 1920×1080, H.264 /
+  `yuv420p`, the exact expected frame count, a duration inside 85–95 s, and a
+  **single stream** — no audio is ever encoded (`-an`);
+- the hero beat prints which path it took (`rotation` = the real table
+  re-plotted from the bins, `parallax` = fallback on the compare PNG).
+
+Copy on screen is held to the same standard: the verification numbers and the
+edit-journal tally are parsed out of the real `report.md`, the code card is
+lifted verbatim from `TUNE_Basics_Guide_R14.py`, and a test asserts every figure
+quoted in a log caption appears in `analysis_findings.md`.
+
 ## Files
 
 | File                | Role                                                            |
