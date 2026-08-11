@@ -35,6 +35,7 @@ import numpy as np
 import config
 
 CACHE = config.ASSET_DIR / "hook_data.json"
+CACHE_SCHEMA = 2        # bump when the cached shape changes; older files re-derive
 
 SMOOTH_N = 5            # samples ≈ 0.2 s at the logs' ~24 Hz
 MIN_GEAR = 3            # 2nd-gear Calc HP reads high; 3rd is the comparable gear
@@ -65,6 +66,13 @@ class HookData:
     curve_rpm: list[float]          # the headline revision's hp/tq curve
     curve_hp: list[float]
     curve_tq: list[float]
+    trace_t: list[float]            # the same pull, sample by sample, for the
+    trace_rpm: list[float]          # live table walk: seconds from pull start,
+    trace_airmass: list[float]      # engine speed, and airmass (mg/stk)
+
+    @property
+    def trace_duration_s(self) -> float:
+        return self.trace_t[-1] - self.trace_t[0] if self.trace_t else 0.0
 
     @property
     def headline(self) -> RevPeak:
@@ -111,6 +119,27 @@ def _raw_column(path, header: str) -> np.ndarray | None:
     return np.asarray(out, dtype=float)
 
 
+def _walk(lf, sl: slice) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """The pull's (time, rpm, airmass) — what the table-walk beat plays back.
+
+    Returns ``None`` if the file lacks a usable clock or airmass, because the
+    beat animates a real lookup or it does not run at all.
+    """
+    rpm = lf.channel("rpm")
+    airmass = lf.channel("airmass")
+    time = lf.time
+    if rpm is None or airmass is None or time is None:
+        return None
+    t = np.asarray(time[sl], dtype=float)
+    r = np.asarray(rpm[sl], dtype=float)
+    a = np.asarray(airmass[sl], dtype=float)
+    ok = np.isfinite(t) & np.isfinite(r) & np.isfinite(a)
+    if ok.sum() < 10:
+        return None
+    t, r, a = t[ok], r[ok], a[ok]
+    return t - t[0], r, a
+
+
 def _import_analysis():
     if str(config.CODE_ROOT) not in sys.path:
         sys.path.insert(0, str(config.CODE_ROOT))
@@ -130,7 +159,7 @@ def _peak(arr: np.ndarray | None, lo: int, hi: int) -> float | None:
 
 
 def _best_pull(folder):
-    """The highest-hp comparable pull in a log folder, plus its (rpm, hp, tq)."""
+    """The highest-hp comparable pull in a log folder, its curve, and its walk."""
     load_logset, detect_pulls = _import_analysis()
     logset = load_logset(folder)
     by_name = {lf.name: lf for lf in logset}
@@ -169,7 +198,7 @@ def _best_pull(folder):
                 np.asarray(hp_col[sl], dtype=float),
                 np.asarray(tq_col[sl], dtype=float) if tq_col is not None else None,
             )
-            best = (peak, trace)
+            best = (peak, trace, _walk(lf, sl))
 
     if best is None:
         if not saw_pull:
@@ -247,6 +276,7 @@ def _derive() -> HookData:
     revisions: list[RevPeak] = []
     excluded: list[dict] = []
     curve: tuple[list[float], list[float], list[float]] | None = None
+    walk = None
 
     for folder in folders:
         best, reason = _best_pull(folder)
@@ -254,10 +284,11 @@ def _derive() -> HookData:
         if best is None:
             excluded.append({"rev": rev, "reason": reason})
             continue
-        peak, trace = best
+        peak, trace, pull_walk = best
         revisions.append(peak)
         if rev == HEADLINE_REV:
             curve = _curve(trace)
+            walk = pull_walk
 
     if not revisions:
         raise SystemExit("no comparable WOT pulls found in any Logs/BasicsGuide_R* folder")
@@ -266,8 +297,15 @@ def _derive() -> HookData:
             f"the headline revision {HEADLINE_REV} has no comparable pull "
             f"(excluded: {excluded}) — point HEADLINE_REV at a revision that does"
         )
+    if walk is None:
+        raise SystemExit(
+            f"{HEADLINE_REV}'s pull has no usable time/airmass channels — the "
+            "table-walk beat animates a real lookup, so it cannot be faked"
+        )
     return HookData(revisions=revisions, excluded=excluded,
-                    curve_rpm=curve[0], curve_hp=curve[1], curve_tq=curve[2])
+                    curve_rpm=curve[0], curve_hp=curve[1], curve_tq=curve[2],
+                    trace_t=walk[0].tolist(), trace_rpm=walk[1].tolist(),
+                    trace_airmass=walk[2].tolist())
 
 
 @lru_cache(maxsize=1)
@@ -275,16 +313,22 @@ def hook_data() -> HookData:
     """The hook's figures, cached on disk between builds."""
     if CACHE.is_file():
         raw = json.loads(CACHE.read_text())
-        return HookData(
-            revisions=[RevPeak(**r) for r in raw["revisions"]],
-            excluded=raw["excluded"],
-            curve_rpm=raw["curve_rpm"], curve_hp=raw["curve_hp"], curve_tq=raw["curve_tq"],
-        )
+        if raw.get("schema") == CACHE_SCHEMA:      # a stale cache is re-derived
+            return HookData(
+                revisions=[RevPeak(**r) for r in raw["revisions"]],
+                excluded=raw["excluded"],
+                curve_rpm=raw["curve_rpm"], curve_hp=raw["curve_hp"],
+                curve_tq=raw["curve_tq"], trace_t=raw["trace_t"],
+                trace_rpm=raw["trace_rpm"], trace_airmass=raw["trace_airmass"],
+            )
     data = _derive()
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     CACHE.write_text(json.dumps(
-        {"revisions": [asdict(r) for r in data.revisions], "excluded": data.excluded,
-         "curve_rpm": data.curve_rpm, "curve_hp": data.curve_hp, "curve_tq": data.curve_tq},
+        {"schema": CACHE_SCHEMA,
+         "revisions": [asdict(r) for r in data.revisions], "excluded": data.excluded,
+         "curve_rpm": data.curve_rpm, "curve_hp": data.curve_hp, "curve_tq": data.curve_tq,
+         "trace_t": data.trace_t, "trace_rpm": data.trace_rpm,
+         "trace_airmass": data.trace_airmass},
         indent=2))
     return data
 
@@ -304,3 +348,6 @@ if __name__ == "__main__":
     print(f"gain     : +{d.hp_gain:.0f} hp")
     print(f"curve    : {len(d.curve_rpm)} points, "
           f"{d.curve_rpm[0]:.0f}-{d.curve_rpm[-1]:.0f} rpm")
+    print(f"walk     : {len(d.trace_t)} samples over {d.trace_duration_s:.1f} s, "
+          f"{min(d.trace_rpm):.0f}-{max(d.trace_rpm):.0f} rpm, "
+          f"{min(d.trace_airmass):.0f}-{max(d.trace_airmass):.0f} mg/stk")

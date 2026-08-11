@@ -107,9 +107,10 @@ BEATS = {b.id: b for b in TIMELINE}
 HOOK_TIMELINE: tuple[Beat, ...] = (
     Beat("boost",  0.0,  3.0,  "Peak boost"),
     Beat("dyno",   3.0,  8.0,  "What it makes"),
-    Beat("climb",  8.0,  13.0, "Revision by revision"),
-    Beat("map",    13.0, 17.0, "The map that did it"),
-    Beat("logo",   17.0, 20.0, "simoscal"),
+    Beat("trace",  8.0,  13.0, "The map, live"),
+    Beat("climb",  13.0, 18.0, "Revision by revision"),
+    Beat("map",    18.0, 22.0, "The map that did it"),
+    Beat("logo",   22.0, 25.0, "simoscal"),
 )
 
 HOOK_BEATS = {b.id: b for b in HOOK_TIMELINE}

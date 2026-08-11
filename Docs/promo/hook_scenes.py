@@ -22,6 +22,7 @@ from pathlib import Path
 import compositor as C
 import config
 import scene_surface
+import scene_trace
 from compositor import Frame
 from hook_data import hook_data
 
@@ -372,6 +373,7 @@ def logo_frame(i: int, n: int) -> Frame:
 FRAME_FUNCS = {
     "boost": boost_frame,
     "dyno": dyno_frame,
+    "trace": scene_trace.trace_frame,
     "climb": climb_frame,
     "map": map_frame,
     "logo": logo_frame,

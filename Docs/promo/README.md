@@ -7,7 +7,7 @@ only; no voiceover, no baked audio (so a music bed can be dropped on later).
 
 | Cut           | File                   | Length | What it does                                              |
 |---------------|------------------------|--------|-----------------------------------------------------------|
-| **Hook**      | `simoscal_hook.mp4`    | 20 s   | Result first. Boost, dyno, the climb, the map, the name.  |
+| **Hook**      | `simoscal_hook.mp4`    | 25 s   | Result first. Boost, dyno, the live table walk, the climb, the map, the name. |
 | **Deep dive** | `simoscal_promo.mp4`   | 90 s   | The whole loop: write → verify → report → flash → log.    |
 
 The hook is the one to lead with; the deep dive is where someone goes next.
@@ -33,6 +33,7 @@ Useful while iterating:
 ```bash
 python3 Docs/promo/hook_data.py                 # print the hook's real figures
 python3 Docs/promo/hook_scenes.py out/          # stills of every hook beat
+python3 Docs/promo/scene_trace.py out/          # stills of the table-walk beat
 python3 Docs/promo/build_hook.py --only dyno    # one beat -> preview_hook_dyno.mp4
 python3 Docs/promo/build_promo.py --only logs   # one beat -> preview_logs.mp4
 python3 Docs/promo/build_promo.py --frames      # keep numbered PNGs in frames/
@@ -104,8 +105,9 @@ rather than "faster every revision", because the latter is not true.
 | `scenes.py`         | Deep dive, beats 1–4 and 6–8                                    |
 | `scene_surface.py`  | The hero 3D surface — used by both cuts                         |
 | `build_promo.py`    | Deep dive: all beats → frames → ffmpeg → mp4, then self-checks  |
-| `hook_data.py`      | The hook's figures, derived from the real logs (see above)      |
-| `hook_scenes.py`    | The hook's five beats                                           |
+| `hook_data.py`      | The hook's figures + pull trace, derived from the real logs     |
+| `hook_scenes.py`    | The hook's beats, and the dispatch table for all six            |
+| `scene_trace.py`    | The tach + live table-walk beat                                 |
 | `build_hook.py`     | Hook: render → ffmpeg → mp4, sharing the deep dive's QA gates   |
 | `tests/`            | `python3 -m pytest Docs/promo/tests -q`                         |
 
@@ -118,11 +120,22 @@ Deep dive — 90 s:
 5 surface  42–56s  6 flash  56–62s   7 logs    62–80s   8 outro  80–90s
 ```
 
-Hook — 20 s, hard cuts, no crossfades:
+Hook — 25 s, hard cuts, no crossfades:
 
 ```
-1 boost  0–3s   2 dyno  3–8s   3 climb  8–13s   4 map  13–17s   5 logo  17–20s
+1 boost  0–3s    2 dyno  3–8s    3 trace  8–13s
+4 climb  13–18s  5 map  18–22s   6 logo   22–25s
 ```
+
+Beat 3 (`scene_trace.py`) is the live one: a MK7-style rev counter on the right
+sweeping the real engine speed of the same 3rd-gear pull the dyno beat plots,
+and `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][0][0]` — Basic ignition angle, low port
+flap, standard on the left, with the cell the ECU was reading lit up as the
+needle climbs. Both halves run off one time index so they cannot drift apart,
+and cell attribution uses the nearest-breakpoint rule from
+`simoscal.analysis.coverage` against breakpoints read out of the flashed R14
+bin. Orange in that table means "the log hit this cell" — the table's own
+shading is deliberately a cool ramp so the two never get confused.
 
 ## Requirements
 

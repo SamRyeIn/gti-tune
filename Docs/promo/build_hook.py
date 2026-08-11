@@ -29,7 +29,11 @@ from hook_data import hook_data
 
 FRAME_DIR = config.PROMO_DIR / "frames_hook"
 
-DURATION_MIN_S, DURATION_MAX_S = 18.0, 22.0
+# Derived from the timeline rather than hard-coded, so editing a beat's length
+# does not leave a stale gate behind. The tolerance catches an encode that
+# silently dropped or duplicated frames, not a deliberate re-cut.
+_HOOK_S = config.hook_total_frames() / config.FPS
+DURATION_MIN_S, DURATION_MAX_S = _HOOK_S - 0.5, _HOOK_S + 0.5
 
 
 def _ffmpeg_cmd(out_path: Path, source: str) -> list[str]:
