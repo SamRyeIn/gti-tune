@@ -1,5 +1,6 @@
 # Generated promo build products — reproducible from the scripts + real outputs.
 frames/
+frames_hook/
 assets/
 *.mp4
 __pycache__/

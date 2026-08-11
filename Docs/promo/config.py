@@ -26,7 +26,8 @@ PROMO_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PROMO_DIR.parents[1]
 ASSET_DIR = PROMO_DIR / "assets"
 FRAME_DIR = PROMO_DIR / "frames"
-OUT_MP4 = PROMO_DIR / "simoscal_promo.mp4"
+OUT_MP4 = PROMO_DIR / "simoscal_promo.mp4"      # the 90 s deep dive
+OUT_HOOK_MP4 = PROMO_DIR / "simoscal_hook.mp4"  # the 20 s hook
 
 # ---------------------------------------------------------------------- palette
 
@@ -100,6 +101,22 @@ TIMELINE: tuple[Beat, ...] = (
 )
 
 BEATS = {b.id: b for b in TIMELINE}
+
+# The 20-second hook — a separate, shorter cut that leads with the result and
+# only names the library at the end. Same engine, its own timeline and scenes.
+HOOK_TIMELINE: tuple[Beat, ...] = (
+    Beat("boost",  0.0,  3.0,  "Peak boost"),
+    Beat("dyno",   3.0,  8.0,  "What it makes"),
+    Beat("climb",  8.0,  13.0, "Revision by revision"),
+    Beat("map",    13.0, 17.0, "The map that did it"),
+    Beat("logo",   17.0, 20.0, "simoscal"),
+)
+
+HOOK_BEATS = {b.id: b for b in HOOK_TIMELINE}
+
+
+def hook_total_frames() -> int:
+    return sum(b.n_frames for b in HOOK_TIMELINE)
 
 
 def frame_index(t_s: float) -> int:
