@@ -14,6 +14,9 @@ Key constraints:
   them unless explicitly asked.
 - `Code/` is an independent nested repository. Check its status separately
   when working on the `simoscal` library.
+- `Code/code_review.md` is the living code-review log for `simoscal` — check
+  its findings index before trusting or extending reviewed code, and append
+  new reviews there.
 - For table references, use both the parameter ID and its plain-English
   description as required by `CLAUDE.md`.
 

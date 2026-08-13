@@ -14,6 +14,9 @@ Boot reading order for a fresh session, before doing tuning work:
 1. This file (loaded automatically) + auto-memory (`MEMORY.md` index).
 2. `index.md` — wiki home: car quick-facts, knowledge-base note index.
 3. `Code/README.md` — the `simoscal` API, workflow diagram, safety model.
+   `Code/code_review.md` is the living code-review log for the `simoscal`
+   library — check its findings index before trusting or extending reviewed
+   code, and append new reviews there (see its own "How to use this file").
 4. The active tune's `REV_LOG.md` (e.g. `Tunes/TuningBasicsGuide/REV_LOG.md`)
    and the latest `Logs/<Tune>_R<rev>/log_review.md` — current tune state.
 5. The active tune's `README_NEXT_STEPS.md` (e.g.
@@ -122,6 +125,13 @@ knock). Full safety model in `Code/README.md` § Safety. Core rules:
 - `C_M_AIR_CYL_SP_MAX` — Maximum allowed airmass setpoint stores **kg/stk**
   despite the XDF's mg/stk label: write `0.002` for a 2000 mg/stk ceiling,
   never `2000` (see the `air-cyl-sp-max-kg-not-mg` memory).
+- `C_PRS_IM_SP_MAX` / `C_PRS_IM_SP_LIM` — Maximum / limit requested
+  intake-manifold pressure setpoint are **float32**, and the max declared for
+  them in the XDF is not a real ECU ceiling (stock already exceeds it) — never
+  treat an XDF-declared max as a guard on these tables. Overboost-fault routing
+  lives in `IP_PUT_AMP_DIF_MAX_PRS_DIF_THR` — Overboost pressure-difference
+  threshold (int16), **not** `C_PRS_IM_SP_LIM`; the R05 recipe mis-routed it
+  once. Detail and exact figures: `knowledge/ecu-tuning-basics.md`.
 
 ## Always name tables by ID + plain-English description
 
