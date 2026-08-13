@@ -6,9 +6,17 @@ for any other part of the promo. The rules, and why:
 
 * **Detected WOT pulls only.** Pull windows come from `simoscal.analysis`, the
   same detector the log reviews use — not a max over the whole file.
-* **3rd gear or higher.** SimosTools' `Calc HP (hp)` is acceleration-derived, so
-  a 2nd-gear pull reads high: the same R14 log shows 372 hp in 2nd and 347 hp in
-  3rd. Third is the comparable gear, so third is what gets quoted.
+* **In-gear samples only.** `Calc HP` is acceleration-derived *and*
+  gear-ratio-weighted, so the samples where the gear channel has already flipped
+  to the next ratio while the engine is still pulling read ~50 hp high. That is a
+  pure artifact — it is what drew a spike at the top of the rpm range, and it was
+  also setting the quoted peak. Every pull is trimmed to the samples still in its
+  attributed gear before anything is peaked, curved, or plotted. See `_in_gear`.
+* **3rd gear or higher.** Third is the gear this car's comparable pulls are
+  logged in, and the only one with full-range coverage: the R14 2nd-gear windows
+  are ~50 samples and do not start until ~3750 rpm. Trimmed, 2nd and 3rd now
+  agree to within ~4 hp on the same R14 session (294 vs 298) — before the trim,
+  2nd read 372 and 3rd 347, and that gap was the artifact, not the gearing.
 * **Smoothed.** A short moving average over the pull kills single-sample spikes;
   the peak of the smoothed trace is the number, not the peak sample.
 * **Comparable pulls only, for the revision series.** A revision is charted only
@@ -35,7 +43,7 @@ import numpy as np
 import config
 
 CACHE = config.ASSET_DIR / "hook_data.json"
-CACHE_SCHEMA = 2        # bump when the cached shape changes; older files re-derive
+CACHE_SCHEMA = 3        # bump when the cached shape changes; older files re-derive
 
 SMOOTH_N = 5            # samples ≈ 0.2 s at the logs' ~24 Hz
 MIN_GEAR = 3            # 2nd-gear Calc HP reads high; 3rd is the comparable gear
@@ -119,7 +127,7 @@ def _raw_column(path, header: str) -> np.ndarray | None:
     return np.asarray(out, dtype=float)
 
 
-def _walk(lf, sl: slice) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+def _walk(lf, rows: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """The pull's (time, rpm, airmass) — what the table-walk beat plays back.
 
     Returns ``None`` if the file lacks a usable clock or airmass, because the
@@ -130,9 +138,9 @@ def _walk(lf, sl: slice) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     time = lf.time
     if rpm is None or airmass is None or time is None:
         return None
-    t = np.asarray(time[sl], dtype=float)
-    r = np.asarray(rpm[sl], dtype=float)
-    a = np.asarray(airmass[sl], dtype=float)
+    t = np.asarray(time[rows], dtype=float)
+    r = np.asarray(rpm[rows], dtype=float)
+    a = np.asarray(airmass[rows], dtype=float)
     ok = np.isfinite(t) & np.isfinite(r) & np.isfinite(a)
     if ok.sum() < 10:
         return None
@@ -148,14 +156,37 @@ def _import_analysis():
     return load_logset, detect_pulls
 
 
-def _peak(arr: np.ndarray | None, lo: int, hi: int) -> float | None:
-    """Peak of the smoothed trace over rows `lo..hi` inclusive."""
+def _peak(arr: np.ndarray | None, rows: np.ndarray) -> float | None:
+    """Peak of the smoothed trace over the given rows."""
     if arr is None:
         return None
-    seg = _finite(arr[lo:hi + 1])
+    seg = _finite(arr[rows])
     if seg.size < SMOOTH_N:
         return None
     return float(_smooth(seg).max())
+
+
+def _in_gear(lf, pull) -> np.ndarray:
+    """Row indices of the pull that are still in the gear it was attributed to.
+
+    `Calc HP` is acceleration-derived *and* gear-ratio-weighted, so a sample
+    carrying the wrong gear carries the wrong power. The DSG's gear channel
+    flips to the next ratio a few samples before the shift actually takes the
+    engine down — in R14's best pull, gear reads 4 for eight samples while rpm
+    is still climbing to 6276, and `Calc HP` jumps 292 → 348 hp across that
+    boundary while longitudinal acceleration is *falling*. Those samples are the
+    spike at the top of the rpm range, and they were also setting the headline
+    figure, so they are cut before anything is peaked or plotted.
+
+    A pull whose gear is unresolved never gets this far (`_best_pull` requires
+    a resolved gear), so there is no guessing here.
+    """
+    rows = np.arange(pull.start_row, pull.end_row + 1)
+    gear = lf.channel("gear")
+    if gear is None:
+        return rows
+    g = np.round(np.asarray(gear[rows], dtype=float))
+    return rows[g == pull.gear]
 
 
 def _best_pull(folder):
@@ -171,12 +202,19 @@ def _best_pull(folder):
         saw_pull = True
         if not (pull.gear_resolved and pull.gear is not None and pull.gear >= MIN_GEAR):
             continue
-        if pull.rpm_max < REDLINE_RPM:
+        lf = by_name[pull.file]
+        rows = _in_gear(lf, pull)
+        if rows.size < SMOOTH_N:
+            continue
+        rpm_col = np.asarray(lf.channel("rpm")[rows], dtype=float)
+        rpm_max = float(np.nanmax(rpm_col)) if np.isfinite(rpm_col).any() else 0.0
+        # Judged on the in-gear sweep: a pull only counts as full if it ran to
+        # redline *before* the shift, not counting the post-flip samples.
+        if rpm_max < REDLINE_RPM:
             continue
         reached_redline = True
-        lf = by_name[pull.file]
         hp_col = lf.channel("calc_hp")
-        hp = _peak(hp_col, pull.start_row, pull.end_row)
+        hp = _peak(hp_col, rows)
         if hp is None:
             continue
         if best is None or hp > best[0].hp:
@@ -186,25 +224,25 @@ def _best_pull(folder):
             peak = RevPeak(
                 rev=folder.name.split("_")[-1],
                 hp=hp,
-                tq=_peak(tq_col, pull.start_row, pull.end_row),
-                boost=_peak(lf.channel("boost"), pull.start_row, pull.end_row),
-                rpm_max=pull.rpm_max,
+                tq=_peak(tq_col, rows),
+                boost=_peak(lf.channel("boost"), rows),
+                rpm_max=rpm_max,
                 gear=pull.gear,
                 log=lf.name,
             )
-            sl = slice(pull.start_row, pull.end_row + 1)
             trace = (
-                np.asarray(lf.channel("rpm")[sl], dtype=float),
-                np.asarray(hp_col[sl], dtype=float),
-                np.asarray(tq_col[sl], dtype=float) if tq_col is not None else None,
+                rpm_col,
+                np.asarray(hp_col[rows], dtype=float),
+                np.asarray(tq_col[rows], dtype=float) if tq_col is not None else None,
             )
-            best = (peak, trace, _walk(lf, sl))
+            best = (peak, trace, _walk(lf, rows))
 
     if best is None:
         if not saw_pull:
             reason = "no WOT pulls detected"
         elif not reached_redline:
-            reason = f"no gear-{MIN_GEAR}-or-higher pull reaching {REDLINE_RPM:.0f} rpm"
+            reason = (f"no gear-{MIN_GEAR}-or-higher pull reaching {REDLINE_RPM:.0f} rpm "
+                      f"before its upshift")
         else:
             reason = "no Calc HP channel on the qualifying pulls"
         return None, reason
