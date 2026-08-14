@@ -168,3 +168,23 @@ The gear offset in a SimosTools log is determined by the CSV column header:
 This was confirmed by matching the same physical gear across two logs (drive
 ratio ≈ 45.9 rpm/km/h): logged `2` under `Gear ()` vs `3` under `Gear (gear)` —
 a clean +1 offset. Always check the header before interpreting or reporting gear.
+
+## Trim to in-gear samples before quoting Calc HP or Calc TQ
+
+SimosTools' `Calc HP (hp)` and `Calc TQ (nm)` are acceleration-derived **and**
+gear-ratio-weighted. The DSG's gear channel flips to the next ratio several
+samples *before* the shift actually pulls the engine down, so those samples get
+computed against the wrong ratio and read about **50 hp high** — a step at the
+very top of every pull that ends in an upshift.
+
+Measured on `Logs/BasicsGuide_R14/simostools-2026_08_10-12_02_12.csv`: at the
+3 → 4 flip `Calc HP` jumps 292 → 343 hp while `Accel. Long` is *falling* and rpm
+is still climbing. The R14 3rd-gear peak is **347 hp raw, 298 hp trimmed**, and
+every revision whose pull window caught a flip was inflated the same way.
+
+So before peaking, curving, or plotting either channel over a pull, drop the rows
+where the gear channel is not the pull's attributed gear
+(`round(gear) == pull.gear`). Reference implementation:
+`Docs/promo/hook_data.py::_in_gear`. The old rule of thumb that a 2nd-gear pull
+reads high was this artifact rather than gearing — trimmed, 2nd and 3rd agree to
+within ~4 hp on the same session.
