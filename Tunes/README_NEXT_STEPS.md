@@ -1,13 +1,26 @@
-# Next steps — TuningBasicsGuide
+# Next steps — Tune lineage
 
 Living scratchpad for **what we want to change in upcoming tune revisions**, before
 the work is scripted. One section per planned revision, newest ideas appended as
 they come up. When a revision is actually built, its authoritative record moves to
-`REV_LOG.md` (per-revision rationale) and the `TUNE_Basics_Guide_R<NN>.py` header
+`REV_LOG.md` (per-revision rationale) and the revision script's own header
 history — this file is the pre-work idea queue, not the change log.
+
+This file now lives at the `Tunes/` root and spans both project folders: it
+tracked `TuningBasicsGuide` (R00–R15) alone until R15, and continues into
+`MainTune` (R16 onward) — see `REV_LOG.md` for the project split.
 
 Current lineage tip: **R15 — built and verified, awaiting Sam's review + flash**
 (see `REV_LOG.md`). R14 is flashed, logged and reviewed.
+
+**`Tunes/MainTune/` now exists** for R16 onward, with output bins renamed to
+`Patched_259L_R<NN>.bin` (dropping the `CB_HSL_SP2933_..._BasicsGuide_` prefix
+`TuningBasicsGuide` used). R16 is not written yet — it's blocked on flashing
+and logging R15 first, since R16 will need R15's validation logs the same way
+R15 needed R14's. When it's time: copy `TUNE_Basics_Guide_R15.py` into
+`Tunes/MainTune/TUNE_MainTune_R16.py`, update `OUT_ROOT`, `OUT_BIN_NAME`, and
+the R15 reference-bin path, then edit the domain calls per R15's log findings.
+Guide: `Code/docs/authoring-a-revision.md`.
 
 **R14 was the first real calibration change in the `simoscal.tune` API** — a stock
 map on slot 1 and the drivable slots ordered least→most aggressive (1 stock

@@ -1,9 +1,21 @@
-# TuningBasicsGuide — Revision Log
+# Tune Revision Log
 
-Lineage of the `TUNE_Basics_Guide_R*.py` tune scripts. Each revision is a
-separate file; this log summarizes what changed at each step. Every run writes a
-fresh timestamped folder under `TUNE_Basics_Guide_out/R<rev>_<timestamp>/`
-holding the saved bin, `report.md`, and `compare/` PNGs.
+Single, continuous revision lineage across the car's tune projects. Each
+revision is a separate script file; this log summarizes what changed at each
+step, in one unbroken numbering sequence regardless of which project folder
+holds the script. Every run writes a fresh timestamped folder under
+`<Project>_out/R<rev>_<timestamp>/` holding the saved bin, `report.md`, and
+`compare/` PNGs.
+
+- **R00–R15** — `Tunes/TuningBasicsGuide/` — worked the ecu-tuning-basics guide
+  end to end, output bins prefixed `CB_HSL_SP2933_5G0906259L_0002_BasicsGuide_`.
+- **R16 onward** — `Tunes/MainTune/` — the guide is fully worked; this project
+  continues the same calibration and numbering as the car's ongoing daily tune.
+  Output bins are named `Patched_259L_R<NN>.bin`.
+
+This file and `README_NEXT_STEPS.md` live at the `Tunes/` root (not inside
+either project folder) so one document tracks the full lineage across the
+split.
 
 ## Flash-method rule for this patched lineage
 

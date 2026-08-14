@@ -139,8 +139,8 @@ mean overboost, lean lambda, knock, or a bricked ECU. House rules:
 1. Read `index.md`, then `knowledge/tuning-getting-started.md`.
 2. Skim `knowledge/ecu-tuning-basics.md` — you'll recognize a lot of it from
    your own tuning, and it's the SOP the scripted recipes are built from.
-3. Open `Tunes/TuningBasicsGuide/REV_LOG.md` and a couple of the run-output
-   reports to see what a revision actually looks like end to end.
+3. Open `Tunes/REV_LOG.md` and a couple of the run-output reports to see what
+   a revision actually looks like end to end.
 4. If anything's confusing or you want the bins, just ping me.
 
 Happy to walk through any of it — welcome aboard! 🚗💨
