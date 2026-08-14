@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render and encode the 20-second hook cut.
+"""Render and encode the short hook cut (33 s, opening and closing on the mark).
 
     python3 Docs/promo/build_hook.py               # full build + QA
     python3 Docs/promo/build_hook.py --only dyno   # one beat, for iterating

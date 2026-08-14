@@ -102,18 +102,26 @@ TIMELINE: tuple[Beat, ...] = (
 
 BEATS = {b.id: b for b in TIMELINE}
 
-# The 20-second hook — a separate, shorter cut that leads with the result and
-# only names the library at the end. Same engine, its own timeline and scenes.
+# The hook — a separate, shorter cut that leads with the result. It opens and
+# closes on the *same* wordmark clip: `logo_open` and `logo` are the same length
+# and are rendered by the same frame function, so the cut loops seamlessly and
+# the name is the first and last thing on screen.
 HOOK_TIMELINE: tuple[Beat, ...] = (
-    Beat("boost",  0.0,  3.0,  "Peak boost"),
-    Beat("dyno",   3.0,  8.0,  "What it makes"),
-    Beat("trace",  8.0,  13.0, "The map, live"),
-    Beat("climb",  13.0, 18.0, "Revision by revision"),
-    Beat("map",    18.0, 22.0, "The map that did it"),
-    Beat("logo",   22.0, 25.0, "simoscal"),
+    Beat("logo_open", 0.0,  3.0,  "simoscal"),
+    Beat("boost",     3.0,  6.0,  "Peak boost"),
+    Beat("dyno",      6.0,  11.0, "What it makes"),
+    Beat("trace",     11.0, 16.0, "The map, live"),
+    Beat("climb",     16.0, 21.0, "Revision by revision"),
+    Beat("map",       21.0, 25.0, "The map that did it"),
+    Beat("slots",     25.0, 30.0, "Five maps, one switch"),
+    Beat("logo",      30.0, 33.0, "simoscal"),
 )
 
 HOOK_BEATS = {b.id: b for b in HOOK_TIMELINE}
+
+#: The bookend pair: identical length, identical frame function, so the opening
+#: clip and the closing clip are the same clip.
+HOOK_BOOKENDS = ("logo_open", "logo")
 
 
 def hook_total_frames() -> int:
@@ -144,6 +152,10 @@ def total_duration_s() -> float:
 CODE_ROOT = REPO_ROOT / "Code"                 # the simoscal library (its own repo)
 XDF_PATH = CODE_ROOT / "xdf" / "SC8S50.V1.0.xdf"
 STOCK_BIN = CODE_ROOT / "bin" / "5G0906259L__0002.bin"
+
+# The patch-added map-switch tables live in their own XDF and their own table
+# space — the five per-slot `PUT setpoint` grids the slots beat plots.
+SWITCH_XDF = REPO_ROOT / "BinToolz-main" / "definitions" / "S50 Switch Patch.29.33.V2.xdf"
 
 TUNE_DIR = REPO_ROOT / "Tunes" / "TuningBasicsGuide"
 TUNE_OUT_ROOT = TUNE_DIR / "TUNE_Basics_Guide_out"

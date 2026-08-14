@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""The 20-second hook: result first, library named last.
+"""The short hook: result first, wordmark at both ends.
 
-Five beats, hard-cut, one idea — *this is what it makes*. The deep-dive promo
-(`scenes.py` + `scene_surface.py`) explains how the library works; this one only
-shows the outcome and puts a name to it at the very end.
+Hard cuts, one idea — *this is what it makes*. The deep-dive promo (`scenes.py` +
+`scene_surface.py`) explains how the library works; this one only shows the
+outcome. It opens and closes on the same wordmark clip (`logo_open` and `logo`
+are one frame function at one length), so the cut loops.
 
 Like the long cut, every figure on screen is real: the numbers come from
 `hook_data`, which derives them from detected WOT pulls in the repo's own logs.
@@ -21,6 +22,7 @@ from pathlib import Path
 
 import compositor as C
 import config
+import scene_slots
 import scene_surface
 import scene_trace
 from compositor import Frame
@@ -371,11 +373,15 @@ def logo_frame(i: int, n: int) -> Frame:
 # ------------------------------------------------------------------- dispatch
 
 FRAME_FUNCS = {
+    # The opening and closing beats share one frame function and one length, so
+    # the cut opens on the very clip it ends on.
+    "logo_open": logo_frame,
     "boost": boost_frame,
     "dyno": dyno_frame,
     "trace": scene_trace.trace_frame,
     "climb": climb_frame,
     "map": map_frame,
+    "slots": scene_slots.slots_frame,
     "logo": logo_frame,
 }
 

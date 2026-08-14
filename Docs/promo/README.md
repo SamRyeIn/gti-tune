@@ -7,7 +7,7 @@ only; no voiceover, no baked audio (so a music bed can be dropped on later).
 
 | Cut           | File                   | Length | What it does                                              |
 |---------------|------------------------|--------|-----------------------------------------------------------|
-| **Hook**      | `simoscal_hook.mp4`    | 25 s   | Result first. Boost, dyno, the live table walk, the climb, the map, the name. |
+| **Hook**      | `simoscal_hook.mp4`    | 33 s   | Result first. Boost, dyno, the live table walk, the climb, the map, the five slots — opening and closing on the wordmark. |
 | **Deep dive** | `simoscal_promo.mp4`   | 90 s   | The whole loop: write → verify → report → flash → log.    |
 
 The hook is the one to lead with; the deep dive is where someone goes next.
@@ -65,8 +65,9 @@ edit-journal tally are parsed out of the real `report.md`, the code card is
 lifted verbatim from `TUNE_Basics_Guide_R14.py`, and a test asserts every figure
 quoted in a log caption appears in `analysis_findings.md`.
 
-`build_hook.py` runs the same encode, probe, and frame-count gates against a
-18–22 s window, and prints which revisions were excluded from the chart.
+`build_hook.py` runs the same encode, probe, and frame-count gates against its
+own duration window (derived from `HOOK_TIMELINE`, so a re-cut moves the gate
+with it), and prints which revisions were excluded from the chart.
 
 ## Where the hook's numbers come from
 
@@ -75,25 +76,42 @@ worth stating (it prints all of this when run directly):
 
 - **Detected WOT pulls only** — pull windows come from `simoscal.analysis`, the
   same detector the log reviews use, not a max over the whole file.
-- **3rd gear or higher.** SimosTools' `Calc HP (hp)` is acceleration-derived, so
-  a lower gear reads high — the same R14 log shows **372 hp in 2nd and 347 hp in
-  3rd**. Third is the comparable gear, so third is what gets quoted.
+- **In-gear samples only.** `Calc HP (hp)` is acceleration-derived *and*
+  gear-ratio-weighted, and the DSG's gear channel flips to the next ratio a few
+  samples before the shift actually pulls the engine down. Those samples read
+  ~50 hp high: in R14's best pull `Calc HP` jumps 292 → 348 while longitudinal
+  acceleration is *falling*. Every pull is trimmed to the samples still in its
+  attributed gear, which is what removed the spike at the top of the dyno curve.
+  Raw, that pull peaked at 347 hp; trimmed, **298 hp** — and the whole series
+  moves with it (see below).
+- **3rd gear or higher.** Third is the gear the comparable pulls are logged in
+  and the only one with full-range coverage. Trimmed, 2nd and 3rd agree to ~4 hp
+  (294 vs 298); the old "372 in 2nd vs 347 in 3rd" gap was the artifact above,
+  not the gearing.
 - **Smoothed.** A ~0.2 s moving average over the pull; the peak of the smoothed
   trace is the number, not the peak sample.
 - **Comparable pulls only** in the revision chart: a revision is charted only if
-  it has a 3rd-gear-or-higher pull that ran past 6000 rpm. R11 is excluded on
-  that rule — its only pulls are 4th gear and stop at ~5300 rpm, so its peak is
-  not a peak. The build prints the exclusion and its reason every time.
+  it has a 3rd-gear-or-higher pull that ran past 6000 rpm *before its upshift*.
+  R11 is excluded on that rule — its only pulls are 4th gear and stop at
+  ~5300 rpm, so its peak is not a peak. The build prints the exclusion and its
+  reason every time.
 - **Bars run from zero.** No truncated axis; the gain over the first revision is
   picked out in accent instead.
 - **No counting numbers that aren't anchored.** Values fade in at their real
   figure. The one number that climbs is the hp counter on the dyno beat, which
   tracks the tip of the curve being drawn.
 
-As charted, the series is R01 275 → R04 338 → R07 342 → R08 345 → R09 358 →
-R14 347 hp — a climb overall, but **not monotonic**: R09 is the highest logged
-figure, and R14 sits 11 hp under it. The beat is framed as "+72 hp, R01 → R14"
+As charted, the series is R01 275 → R04 295 → R07 297 → R08 299 → R09 308 →
+R14 298 hp — a climb overall, but **not monotonic**: R09 is the highest logged
+figure, and R14 sits 10 hp under it. The beat is framed as "+23 hp, R01 → R14"
 rather than "faster every revision", because the latter is not true.
+
+Those figures are all lower than the ones this cut originally shipped with
+(R01 275 → R14 347, "+72 hp"). The difference is the in-gear trim: R01's best
+pull happened not to contain a gear flip while every later revision's did, so the
+old series was comparing a clean number against contaminated ones and most of the
+"gain" was the artifact. +23 hp over six revisions on 92 octane at altitude is
+the honest figure.
 
 ## Files
 
@@ -106,8 +124,9 @@ rather than "faster every revision", because the latter is not true.
 | `scene_surface.py`  | The hero 3D surface — used by both cuts                         |
 | `build_promo.py`    | Deep dive: all beats → frames → ffmpeg → mp4, then self-checks  |
 | `hook_data.py`      | The hook's figures + pull trace, derived from the real logs     |
-| `hook_scenes.py`    | The hook's beats, and the dispatch table for all six            |
+| `hook_scenes.py`    | The hook's beats, and the dispatch table for all eight          |
 | `scene_trace.py`    | The tach + live table-walk beat                                 |
+| `scene_slots.py`    | The five map-switch slot boost curves, read out of the tune bin |
 | `build_hook.py`     | Hook: render → ffmpeg → mp4, sharing the deep dive's QA gates   |
 | `tests/`            | `python3 -m pytest Docs/promo/tests -q`                         |
 
@@ -120,12 +139,24 @@ Deep dive — 90 s:
 5 surface  42–56s  6 flash  56–62s   7 logs    62–80s   8 outro  80–90s
 ```
 
-Hook — 25 s, hard cuts, no crossfades:
+Hook — 33 s, hard cuts, no crossfades:
 
 ```
-1 boost  0–3s    2 dyno  3–8s    3 trace  8–13s
-4 climb  13–18s  5 map  18–22s   6 logo   22–25s
+1 logo_open  0–3s    2 boost  3–6s    3 dyno   6–11s   4 trace  11–16s
+5 climb     16–21s   6 map   21–25s   7 slots 25–30s   8 logo   30–33s
 ```
+
+Beats 1 and 8 are the **same clip**: same length, same frame function
+(`hook_scenes.logo_frame`), so the cut opens on the wordmark it closes on and
+loops seamlessly. `config.HOOK_BOOKENDS` names the pair.
+
+Beat 7 (`scene_slots.py`) draws all five map-switch slots — the per-slot
+`PUT setpoint` boost-target grids read by uniqueid out of the newest tune-run
+`.bin`, not retyped from the revision script. The rpm cursor sweeps the shared
+slot axis and each curve is revealed up to it, carrying its live value. The ECU
+stores absolute hPa, so every value is converted to psi *gauge* at standard
+sea-level ambient (1013.25 hPa) and the beat says so on screen — the same target
+is more gauge boost at altitude, so the reference has to be stated.
 
 Beat 3 (`scene_trace.py`) is the live one: a MK7-style rev counter on the right
 sweeping the real engine speed of the same 3rd-gear pull the dyno beat plots,

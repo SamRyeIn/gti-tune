@@ -9,7 +9,8 @@ drift apart.
 The lookup is not mimed. Cell attribution uses the nearest-breakpoint rule from
 `simoscal.analysis.coverage` — the same convention the log reviews use to answer
 "which cells did this log exercise?" — against the breakpoints and values read
-out of the flashed R14 bin.
+out of the newest tune-run bin (`config.newest_tune_out_dir()`, which is not
+necessarily the revision currently in the car).
 
     python3 Docs/promo/scene_trace.py /tmp/trace_preview
 """
