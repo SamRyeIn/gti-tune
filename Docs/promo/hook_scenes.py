@@ -16,14 +16,13 @@ pull, which revisions are comparable) are on screen rather than buried.
 
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 
 import compositor as C
 import config
+import scene_boost
 import scene_slots
-import scene_surface
 import scene_trace
 from compositor import Frame
 from hook_data import hook_data
@@ -32,10 +31,8 @@ MARGIN = 130
 
 # ---------------------------------------------------------------------- copy
 
-BOOST_LABEL = "PEAK BOOST"
 DYNO_KICKER = "MEASURED, NOT MODELLED"
 CLIMB_KICKER = "SIX REVISIONS"
-MAP_KICKER = "ONE TABLE MOVED"
 WORDMARK = ("simos", "cal")
 TAGLINE = "Tune a Simos18 ECU. In code."
 CLOSER = "Python in. Checksum-verified .bin out. You flash it."
@@ -55,80 +52,7 @@ def _provenance(f: Frame, alpha: float, text: str = PROVENANCE) -> None:
            tracking=3, alpha=alpha)
 
 
-# ------------------------------------------------------------- beat 1 · boost
-
-GAUGE_MAX_PSI = 30.0
-GAUGE_START_DEG, GAUGE_SWEEP_DEG = 135.0, 270.0
-GAUGE_R = 268
-
-
-def _gauge_point(cx: float, cy: float, radius: float, frac: float) -> tuple[float, float]:
-    a = math.radians(GAUGE_START_DEG + GAUGE_SWEEP_DEG * frac)
-    return (cx + radius * math.cos(a), cy + radius * math.sin(a))
-
-
-def _gauge(f: Frame, cx: float, cy: float, value: float, alpha: float) -> None:
-    """A boost dial reading `value` psi, drawn straight onto the frame."""
-    if alpha <= 0.01:
-        return
-    dim = tuple(round(c * alpha) for c in config.PALETTE["rule"])
-    faint = tuple(round(c * alpha) for c in config.PALETTE["text_faint"])
-    hot = tuple(round(c * alpha) for c in config.PALETTE["accent"])
-
-    box = (cx - GAUGE_R, cy - GAUGE_R, cx + GAUGE_R, cy + GAUGE_R)
-    f.draw.arc(box, GAUGE_START_DEG, GAUGE_START_DEG + GAUGE_SWEEP_DEG, fill=dim, width=6)
-
-    # The travelled arc, in accent — the dial "fills" as the needle sweeps.
-    frac = C.clamp01(value / GAUGE_MAX_PSI)
-    if frac > 0.002:
-        f.draw.arc(box, GAUGE_START_DEG, GAUGE_START_DEG + GAUGE_SWEEP_DEG * frac,
-                   fill=hot, width=14)
-
-    for psi in range(0, int(GAUGE_MAX_PSI) + 1):
-        major = psi % 5 == 0
-        tf = psi / GAUGE_MAX_PSI
-        r_out = GAUGE_R - 22
-        r_in = r_out - (34 if major else 16)
-        f.draw.line([_gauge_point(cx, cy, r_in, tf), _gauge_point(cx, cy, r_out, tf)],
-                    fill=faint if major else dim, width=5 if major else 3)
-        if major:
-            lx, ly = _gauge_point(cx, cy, r_in - 34, tf)
-            f.text(str(psi), (lx, ly), size=27, color="text_faint", align="center",
-                   valign="middle", alpha=alpha)
-
-    # Needle, with a counterweight tail so it reads as an instrument.
-    tip = _gauge_point(cx, cy, GAUGE_R - 58, frac)
-    tail = _gauge_point(cx, cy, -46, frac)
-    f.draw.line([tail, tip], fill=hot, width=9)
-    f.draw.ellipse((cx - 26, cy - 26, cx + 26, cy + 26), fill=dim, outline=hot, width=6)
-
-
-def boost_frame(i: int, n: int) -> Frame:
-    t = i / max(n - 1, 1)
-    f = Frame()
-    d = hook_data()
-    peak_psi = d.headline.boost or 0.0
-
-    appear = C.ease_out(C.sub(t, 0.0, 0.14))
-    # A touch of overshoot so the needle settles rather than stopping dead.
-    swing = C.keyframe(t, [(0.06, 0.0), (0.46, 1.045), (0.60, 0.992), (0.70, 1.0)],
-                       ease=C.ease_out)
-    value = peak_psi * C.clamp01(swing)
-
-    cx, cy = f.cx + 320, f.cy + 30
-    _gauge(f, cx, cy, value, appear)
-
-    _kicker(f, BOOST_LABEL, C.sub(t, 0.0, 0.2))
-    f.text(f"{value:.1f}", (MARGIN, f.cy - 40), size=250, color="text", bold=True,
-           valign="middle", alpha=appear)
-    f.text("PSI", (MARGIN + 6, f.cy + 120), size=64, color="accent", bold=True,
-           tracking=10, alpha=C.ease_out(C.sub(t, 0.25, 0.45)))
-    _provenance(f, C.ease_out(C.sub(t, 0.55, 0.8)))
-    f.vignette(0.42)
-    return f
-
-
-# -------------------------------------------------------------- beat 2 · dyno
+# -------------------------------------------------------------- beat 1 · dyno
 
 PLOT = (700, 300, 1790, 880)          # left, top, right, bottom of the curve box
 
@@ -221,7 +145,7 @@ def dyno_frame(i: int, n: int) -> Frame:
     return f
 
 
-# ------------------------------------------------------------- beat 3 · climb
+# ------------------------------------------------------------- beat 2 · climb
 
 BAR_BASE_Y = 858
 BAR_TOP_Y = 330
@@ -291,55 +215,7 @@ def climb_frame(i: int, n: int) -> Frame:
     return f
 
 
-# --------------------------------------------------------------- beat 4 · map
-
-MAP_AZIM_START, MAP_AZIM_END = -172.0, -124.0
-
-
-def map_frame(i: int, n: int) -> Frame:
-    t = i / max(n - 1, 1)
-    f = Frame()
-    grids = scene_surface.hero_grids()
-
-    appear = C.ease_out(C.sub(t, 0.0, 0.14))
-    morph = C.ease_in_out(C.sub(t, 0.22, 0.62))
-
-    if grids is not None:
-        azim = C.lerp(MAP_AZIM_START, MAP_AZIM_END, C.ease_in_out(t))
-        # Scaled up from the deep dive's framing: this beat only gets 4 seconds,
-        # so the relief has to read at a glance.
-        f.paste(scene_surface.render_surface(azim, morph), (f.cx + 300, f.cy + 40),
-                scale=1.24, alpha=appear)
-    else:
-        img = C.load(config.PREPARED["surface_hero"])
-        zoom = C.ease_in_out(t)
-        w, h = img.width, img.height
-        inset = 0.03 + 0.04 * zoom
-        rect = (w * inset, h * inset, w * (1 - inset), h * (1 - inset))
-        out_w = 1180
-        view = C.ken_burns(img, 0.0, rect, rect,
-                           (out_w, round(out_w * (rect[3] - rect[1]) / (rect[2] - rect[0]))))
-        f.card(view, (f.cx + 250, f.cy + 60), alpha=appear)
-
-    _kicker(f, MAP_KICKER, C.sub(t, 0.0, 0.18))
-    f.text(config.HERO_TABLE_ID, (MARGIN, 300), size=42, color="text", mono=True,
-           alpha=appear)
-    f.text(config.HERO_TABLE_DESC, (MARGIN, 356), size=31, color="text_dim",
-           italic=True, max_width=520, alpha=appear)
-
-    badge = C.sub(t, 0.22, 0.62)
-    f.text("STOCK", (MARGIN, 470), size=34, color="text_faint", tracking=6,
-           bold=True, alpha=appear * (1 - badge))
-    f.text("TUNED", (MARGIN, 470), size=34, color="accent", tracking=6,
-           bold=True, alpha=appear * badge)
-
-    f.text(scene_surface.delta_caption(), (MARGIN, 560), size=28, color="text_dim",
-           max_width=520, alpha=C.ease_out(C.sub(t, 0.6, 0.8)))
-    f.vignette(0.4)
-    return f
-
-
-# -------------------------------------------------------------- beat 5 · logo
+# -------------------------------------------------------------- beat 3 · logo
 
 def logo_frame(i: int, n: int) -> Frame:
     t = i / max(n - 1, 1)
@@ -376,11 +252,10 @@ FRAME_FUNCS = {
     # The opening and closing beats share one frame function and one length, so
     # the cut opens on the very clip it ends on.
     "logo_open": logo_frame,
-    "boost": boost_frame,
+    "boost": scene_boost.boost_frame,
     "dyno": dyno_frame,
     "trace": scene_trace.trace_frame,
     "climb": climb_frame,
-    "map": map_frame,
     "slots": scene_slots.slots_frame,
     "logo": logo_frame,
 }

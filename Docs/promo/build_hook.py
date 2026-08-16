@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Render and encode the short hook cut (33 s, opening and closing on the mark).
+"""Render and encode the short hook cut (31 s, opening and closing on the mark).
 
     python3 Docs/promo/build_hook.py               # full build + QA
     python3 Docs/promo/build_hook.py --only dyno   # one beat, for iterating
     python3 Docs/promo/build_hook.py --frames      # keep frames_hook/ as PNGs
 
-Same engine as the 90-second deep dive — `compositor`, `config`, and the real
-rotating surface out of `scene_surface` — pointed at `config.HOOK_TIMELINE` and
-`hook_scenes`. Encoding, probing, and the QA gate are shared with
+Same engine as the 90-second deep dive — `compositor` and `config` — pointed at
+`config.HOOK_TIMELINE` and `hook_scenes`. Encoding, probing, and the QA gate are shared with
 `build_promo`, so both cuts are checked the same way.
 """
 
@@ -24,7 +23,6 @@ import build_promo
 import compositor as C
 import config
 import hook_scenes
-import scene_surface
 from hook_data import hook_data
 
 FRAME_DIR = config.PROMO_DIR / "frames_hook"
@@ -127,10 +125,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print("QA:")
     problems = qa(out_path, expected, full_build=not args.only)
-    if any(b.id == "map" for b in beats):
-        print(f"  hero surface path: {scene_surface.SURFACE_PATH}")
     for x in d.excluded:
         print(f"  excluded {x['rev']}: {x['reason']}")
+    for rev in d.boost_missing:
+        print(f"  {rev} charted but not in the boost beat: no boost channel logged")
     if problems:
         for p in problems:
             print(f"  FAIL  {p}")

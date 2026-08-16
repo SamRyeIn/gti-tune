@@ -108,13 +108,12 @@ BEATS = {b.id: b for b in TIMELINE}
 # the name is the first and last thing on screen.
 HOOK_TIMELINE: tuple[Beat, ...] = (
     Beat("logo_open", 0.0,  3.0,  "simoscal"),
-    Beat("boost",     3.0,  6.0,  "Peak boost"),
-    Beat("dyno",      6.0,  11.0, "What it makes"),
-    Beat("trace",     11.0, 16.0, "The map, live"),
-    Beat("climb",     16.0, 21.0, "Revision by revision"),
-    Beat("map",       21.0, 25.0, "The map that did it"),
-    Beat("slots",     25.0, 30.0, "Five maps, one switch"),
-    Beat("logo",      30.0, 33.0, "simoscal"),
+    Beat("boost",     3.0,  8.0,  "Boost, every revision"),
+    Beat("dyno",      8.0,  13.0, "What it makes"),
+    Beat("trace",     13.0, 18.0, "The map, live"),
+    Beat("climb",     18.0, 23.0, "Revision by revision"),
+    Beat("slots",     23.0, 28.0, "Five maps, one switch"),
+    Beat("logo",      28.0, 31.0, "simoscal"),
 )
 
 HOOK_BEATS = {b.id: b for b in HOOK_TIMELINE}

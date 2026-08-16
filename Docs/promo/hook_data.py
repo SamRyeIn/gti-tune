@@ -43,7 +43,7 @@ import numpy as np
 import config
 
 CACHE = config.ASSET_DIR / "hook_data.json"
-CACHE_SCHEMA = 3        # bump when the cached shape changes; older files re-derive
+CACHE_SCHEMA = 4        # bump when the cached shape changes; older files re-derive
 
 SMOOTH_N = 5            # samples ≈ 0.2 s at the logs' ~24 Hz
 MIN_GEAR = 3            # 2nd-gear Calc HP reads high; 3rd is the comparable gear
@@ -68,12 +68,31 @@ class RevPeak:
 
 
 @dataclass(frozen=True)
+class BoostCurve:
+    """One revision's logged gauge boost over the rpm sweep of its best pull.
+
+    Same pull the revision's hp figure comes from, so the boost beat and the
+    climb beat are never describing two different runs of the car.
+    """
+
+    rev: str
+    rpm: list[float]
+    psi: list[float]
+
+    @property
+    def peak(self) -> float:
+        return max(self.psi)
+
+
+@dataclass(frozen=True)
 class HookData:
     revisions: list[RevPeak]        # charted, in revision order
     excluded: list[dict]            # {rev, reason} — kept so the exclusion is visible
     curve_rpm: list[float]          # the headline revision's hp/tq curve
     curve_hp: list[float]
     curve_tq: list[float]
+    boost_curves: list[BoostCurve]  # one per charted revision that logged boost
+    boost_missing: list[str]        # charted revisions whose logs have no boost
     trace_t: list[float]            # the same pull, sample by sample, for the
     trace_rpm: list[float]          # live table walk: seconds from pull start,
     trace_airmass: list[float]      # engine speed, and airmass (mg/stk)
@@ -235,7 +254,12 @@ def _best_pull(folder):
                 np.asarray(hp_col[rows], dtype=float),
                 np.asarray(tq_col[rows], dtype=float) if tq_col is not None else None,
             )
-            best = (peak, trace, _walk(lf, rows))
+            # The boost curve rides the same rows as the hp figure, so the two
+            # beats are always talking about one pull.
+            boost_col = lf.channel("boost")
+            boost = (None if boost_col is None
+                     else _resample(rpm_col, np.asarray(boost_col[rows], dtype=float)))
+            best = (peak, trace, _walk(lf, rows), boost)
 
     if best is None:
         if not saw_pull:
@@ -286,6 +310,30 @@ def _edge_smooth(a: np.ndarray, width: int = 3) -> np.ndarray:
     return np.convolve(np.pad(a, pad, mode="edge"), np.ones(width) / width, mode="valid")
 
 
+def _resample(rpm: np.ndarray, vals: np.ndarray) -> tuple[list[float], list[float]] | None:
+    """One channel over a pull, on an even rpm grid — the single-series `_curve`.
+
+    Same pipeline as `_curve` (finite mask, rising sweep, sort by rpm, interpolate,
+    edge-smooth); kept separate because `_curve` has to carry hp and tq on one
+    shared grid while this returns a curve that owns its own rpm range. That
+    matters here: every revision's pull starts and ends at a different engine
+    speed, and stretching them onto a common grid would invent boost the car
+    never made at rpm it never saw.
+    """
+    ok = np.isfinite(rpm) & np.isfinite(vals)
+    rpm, vals = rpm[ok], vals[ok]
+    if rpm.size < SMOOTH_N:
+        return None
+    sweep = _rising(rpm)
+    rpm, vals = rpm[sweep], vals[sweep]
+    if rpm.size < SMOOTH_N or rpm.max() - rpm.min() < 1.0:
+        return None
+    order = np.argsort(rpm)
+    rpm, vals = rpm[order], vals[order]
+    grid = np.linspace(rpm.min(), rpm.max(), CURVE_BINS)
+    return grid.tolist(), _edge_smooth(np.interp(grid, rpm, vals)).tolist()
+
+
 def _curve(trace) -> tuple[list[float], list[float], list[float]]:
     """Resample a pull's hp/tq onto an even rpm grid so the curve draws smoothly."""
     rpm, hp, tq = trace
@@ -313,6 +361,8 @@ def _derive() -> HookData:
     folders = sorted(config.LOGS_ROOT.glob("BasicsGuide_R*"), key=config._rev_sort_key)
     revisions: list[RevPeak] = []
     excluded: list[dict] = []
+    boost_curves: list[BoostCurve] = []
+    boost_missing: list[str] = []
     curve: tuple[list[float], list[float], list[float]] | None = None
     walk = None
 
@@ -322,8 +372,14 @@ def _derive() -> HookData:
         if best is None:
             excluded.append({"rev": rev, "reason": reason})
             continue
-        peak, trace, pull_walk = best
+        peak, trace, pull_walk, boost = best
         revisions.append(peak)
+        # A revision with no boost channel is named, not quietly absent: the
+        # boost beat says how many revisions it is drawing.
+        if boost is None:
+            boost_missing.append(rev)
+        else:
+            boost_curves.append(BoostCurve(rev=rev, rpm=boost[0], psi=boost[1]))
         if rev == HEADLINE_REV:
             curve = _curve(trace)
             walk = pull_walk
@@ -340,8 +396,14 @@ def _derive() -> HookData:
             f"{HEADLINE_REV}'s pull has no usable time/airmass channels — the "
             "table-walk beat animates a real lookup, so it cannot be faked"
         )
+    if len(boost_curves) < 2:
+        raise SystemExit(
+            f"only {len(boost_curves)} revision(s) logged boost ({boost_missing} did "
+            "not) — the boost beat is a comparison and has nothing to compare"
+        )
     return HookData(revisions=revisions, excluded=excluded,
                     curve_rpm=curve[0], curve_hp=curve[1], curve_tq=curve[2],
+                    boost_curves=boost_curves, boost_missing=boost_missing,
                     trace_t=walk[0].tolist(), trace_rpm=walk[1].tolist(),
                     trace_airmass=walk[2].tolist())
 
@@ -356,7 +418,9 @@ def hook_data() -> HookData:
                 revisions=[RevPeak(**r) for r in raw["revisions"]],
                 excluded=raw["excluded"],
                 curve_rpm=raw["curve_rpm"], curve_hp=raw["curve_hp"],
-                curve_tq=raw["curve_tq"], trace_t=raw["trace_t"],
+                curve_tq=raw["curve_tq"],
+                boost_curves=[BoostCurve(**c) for c in raw["boost_curves"]],
+                boost_missing=raw["boost_missing"], trace_t=raw["trace_t"],
                 trace_rpm=raw["trace_rpm"], trace_airmass=raw["trace_airmass"],
             )
     data = _derive()
@@ -365,6 +429,8 @@ def hook_data() -> HookData:
         {"schema": CACHE_SCHEMA,
          "revisions": [asdict(r) for r in data.revisions], "excluded": data.excluded,
          "curve_rpm": data.curve_rpm, "curve_hp": data.curve_hp, "curve_tq": data.curve_tq,
+         "boost_curves": [asdict(c) for c in data.boost_curves],
+         "boost_missing": data.boost_missing,
          "trace_t": data.trace_t, "trace_rpm": data.trace_rpm,
          "trace_airmass": data.trace_airmass},
         indent=2))
@@ -386,6 +452,12 @@ if __name__ == "__main__":
     print(f"gain     : +{d.hp_gain:.0f} hp")
     print(f"curve    : {len(d.curve_rpm)} points, "
           f"{d.curve_rpm[0]:.0f}-{d.curve_rpm[-1]:.0f} rpm")
+    print(f"\nboost curves ({len(d.boost_curves)}):")
+    for c in d.boost_curves:
+        print(f"  {c.rev:<4} {c.rpm[0]:.0f}-{c.rpm[-1]:.0f} rpm  "
+              f"{min(c.psi):5.1f}-{c.peak:5.1f} psi")
+    for rev in d.boost_missing:
+        print(f"  {rev:<4} NO BOOST CHANNEL — not drawn")
     print(f"walk     : {len(d.trace_t)} samples over {d.trace_duration_s:.1f} s, "
           f"{min(d.trace_rpm):.0f}-{max(d.trace_rpm):.0f} rpm, "
           f"{min(d.trace_airmass):.0f}-{max(d.trace_airmass):.0f} mg/stk")

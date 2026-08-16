@@ -270,6 +270,28 @@ def slide_offset(t01: float, direction: str, distance: float) -> tuple[float, fl
     }[direction]
 
 
+def spread_rows(ys: dict, gap: float, bottom: float | None = None) -> dict:
+    """Nudge label rows apart without reordering them.
+
+    Curve labels want to ride their own line, but curves that sit on top of each
+    other put their labels on the same pixel row, where they stack into mush.
+    This pushes them apart in the order they already have — so a label never
+    crosses another and the reading order still matches the traces — and, if
+    `bottom` is given, lifts the whole set back inside that limit.
+    """
+    out = dict(ys)
+    prev = -1e9
+    for key in sorted(out, key=lambda k: out[k]):
+        out[key] = max(out[key], prev + gap)
+        prev = out[key]
+    if bottom is not None:
+        overflow = max(out.values()) - bottom
+        if overflow > 0:
+            for key in out:
+                out[key] -= overflow
+    return out
+
+
 # ---------------------------------------------------------------------- frame
 
 

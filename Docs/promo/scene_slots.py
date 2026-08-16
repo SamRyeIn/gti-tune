@@ -173,26 +173,6 @@ def _points(slot: int, rpm_now: float) -> list[tuple[float, float]]:
     return pts
 
 
-def _spread(ys: dict[int, float]) -> dict[int, float]:
-    """Nudge label rows apart without reordering them.
-
-    Three of the five slots share a value at low rpm, so their labels would land
-    on the same pixel row and stack into mush. Pushing them apart keeps every
-    slot readable while the curves are still on top of each other, and costs
-    nothing once they separate.
-    """
-    out = dict(ys)
-    prev = -1e9
-    for slot in sorted(out, key=lambda s: out[s]):
-        out[slot] = max(out[slot], prev + LABEL_GAP)
-        prev = out[slot]
-    overflow = max(out.values()) - PLOT[3]
-    if overflow > 0:
-        for slot in out:
-            out[slot] -= overflow
-    return out
-
-
 # ----------------------------------------------------------------- the beat
 
 def _axes(f: Frame, alpha: float) -> None:
@@ -257,7 +237,7 @@ def slots_frame(i: int, n: int) -> Frame:
     # value at the cursor — so which trace is which never depends on a legend
     # key, and the numbers on screen are the ones being drawn.
     if tips:
-        rows = _spread({s: y for s, (_, y) in tips.items()})
+        rows = C.spread_rows({s: y for s, (_, y) in tips.items()}, LABEL_GAP, PLOT[3])
         for slot, (hx, hy) in tips.items():
             label, color, _ = SLOT_STYLE[slot]
             ly = rows[slot]
