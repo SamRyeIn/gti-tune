@@ -14,31 +14,33 @@ Boot reading order for a fresh session, before doing tuning work:
 1. This file (loaded automatically) + auto-memory (`MEMORY.md` index).
 2. `index.md` — wiki home: car quick-facts, knowledge-base note index.
 3. `Code/README.md` — the `simoscal` API, workflow diagram, safety model.
-4. The active tune's `REV_LOG.md` (e.g. `Tunes/TuningBasicsGuide/REV_LOG.md`)
+   `Code/code_review.md` is the living code-review log for the `simoscal`
+   library — check its findings index before trusting or extending reviewed
+   code, and append new reviews there (see its own "How to use this file").
+4. `Tunes/REV_LOG.md` — the single revision lineage across all tune projects —
    and the latest `Logs/<Tune>_R<rev>/log_review.md` — current tune state.
-5. The active tune's `README_NEXT_STEPS.md` (e.g.
-   `Tunes/TuningBasicsGuide/README_NEXT_STEPS.md`) — the pre-work idea queue for
-   upcoming revisions (what to change next, before it's scripted).
+5. `Tunes/README_NEXT_STEPS.md` — the pre-work idea queue for upcoming
+   revisions (what to change next, before it's scripted).
 
 ## Folder structure
 
 Two kinds of folders: **human drop zones** (Sam puts files there; Claude reads
 them) and **Claude-maintained** (Claude writes/updates; human reviews).
 
-| Folder             | Role                            | Contents                                                           |
-|--------------------|---------------------------------|--------------------------------------------------------------------|
-| `Code/`            | Claude-maintained               | The `simoscal` library (its own git repo) — see notes below        |
-| `Code/bin/`        | Human drop zone                 | Known-good stock bin `5G0906259L__0002.bin` — the recovery image   |
-| `Code/xdf/`        | Human drop zone                 | TunerPro XDF definitions; primary is `SC8S50.V1.0.xdf`             |
-| `Tunes/`           | Claude-maintained               | Tune projects: revision scripts, `REV_LOG.md`, run outputs         |
-| `Logs/`            | Human drop → Claude-analyzed    | SimosTools datalog CSVs per flashed revision + `log_review.md`     |
-| `PIDs/`            | Human drop zone                 | SimosTools logging-list CSVs (PID definitions) + PID List Editor   |
-| `Troubleshooting/` | Human drop → Claude-analyzed    | Check-engine / fault info Sam drops in (codes, notes) by topic     |
-| `Docs/`            | Mixed                           | Human: source `.docx` guides; Claude: `plans/`, `brainstorms/`     |
-| `knowledge/`       | Claude-maintained               | The wiki: ingested reference notes + `media/<note>/` screenshots   |
-| `References/`      | Human drop zone                 | External material: Funktionsrahmen PDF, Cobb links, example logs   |
-| `BinToolz-main/`   | Vendored third-party            | BinToolz tool + `.btp` patches — reference only, do not edit       |
-| `index.md`         | Claude-maintained               | Obsidian wiki home page (`.obsidian/` is the vault config)         |
+| Folder             | Role                         | Contents                                                              |
+|--------------------|------------------------------|-----------------------------------------------------------------------|
+| `Code/`            | Claude-maintained            | The `simoscal` library (its own git repo) — see notes below           |
+| `Code/bin/`        | Human drop zone              | Known-good stock bin `5G0906259L__0002.bin` — the recovery image      |
+| `Code/xdf/`        | Human drop zone              | TunerPro XDF definitions; primary is `SC8S50.V1.0.xdf`                |
+| `Tunes/`           | Claude-maintained            | `REV_LOG.md` + `README_NEXT_STEPS.md` (shared lineage), tune projects |
+| `Logs/`            | Human drop → Claude-analyzed | SimosTools datalog CSVs per flashed revision + `log_review.md`        |
+| `PIDs/`            | Human drop zone              | SimosTools logging-list CSVs (PID definitions) + PID List Editor      |
+| `Troubleshooting/` | Human drop → Claude-analyzed | Check-engine / fault info Sam drops in (codes, notes) by topic        |
+| `Docs/`            | Mixed                        | Human: source `.docx` guides; Claude: `plans/`, `brainstorms/`        |
+| `knowledge/`       | Claude-maintained            | The wiki: ingested reference notes + `media/<note>/` screenshots      |
+| `References/`      | Human drop zone              | External material: Funktionsrahmen PDF, Cobb links, example logs      |
+| `BinToolz-main/`   | Vendored third-party         | BinToolz tool + `.btp` patches — reference only, do not edit          |
+| `index.md`         | Claude-maintained            | Obsidian wiki home page (`.obsidian/` is the vault config)            |
 
 Notes:
 
@@ -54,11 +56,16 @@ Notes:
 - `Code/` subfolders: `simoscal/` library source, `tests/`, `demos/`, `bin/`
   stock bin, `xdf/` definitions, `oracles/` captured TunerPro exports (test
   fixtures). XDFs must match the bin's SC8S50 file structure.
-- A `Tunes/<Tune>/` project holds revisioned `TUNE_<Tune>_R<rev>.py` scripts,
-  `REV_LOG.md`, a `README_NEXT_STEPS.md` (living pre-work idea queue for upcoming
-  revisions), and `<Tune>_out/R<rev>_<timestamp>/` run outputs (saved bin,
-  `report.md`, `compare/` PNGs). `Tunes/TuningBasicsGuide/Test/` holds
-  other-model comparison runs — reference only, not part of the lineage.
+- `Tunes/REV_LOG.md` and `Tunes/README_NEXT_STEPS.md` live at the `Tunes/` root
+  and track the **single, continuous revision lineage across all tune
+  projects** — not per-project files. A `Tunes/<Tune>/` project folder holds
+  just the revisioned `TUNE_<Tune>_R<rev>.py` scripts and
+  `<Tune>_out/R<rev>_<timestamp>/` run outputs (saved bin, `report.md`,
+  `compare/` PNGs). R00–R15 are `TuningBasicsGuide`; R16 onward is `MainTune`
+  (bin names dropped the `CB_HSL_SP2933_..._BasicsGuide_` prefix in favor of
+  `Patched_259L_R<NN>.bin`) — see `Tunes/REV_LOG.md` for the split rationale.
+  `Tunes/TuningBasicsGuide/Test/` holds other-model comparison runs —
+  reference only, not part of the lineage.
 - A `Logs/<Tune>_R<rev>/` folder holds the raw `simostools-*.csv` logs Sam
   drops in, a `*.bin.txt` record of what was flashed, and Claude-written
   analysis: `log_review.md` (living review doc), plot scripts, `plots/`.
@@ -122,6 +129,13 @@ knock). Full safety model in `Code/README.md` § Safety. Core rules:
 - `C_M_AIR_CYL_SP_MAX` — Maximum allowed airmass setpoint stores **kg/stk**
   despite the XDF's mg/stk label: write `0.002` for a 2000 mg/stk ceiling,
   never `2000` (see the `air-cyl-sp-max-kg-not-mg` memory).
+- `C_PRS_IM_SP_MAX` / `C_PRS_IM_SP_LIM` — Maximum / limit requested
+  intake-manifold pressure setpoint are **float32**, and the max declared for
+  them in the XDF is not a real ECU ceiling (stock already exceeds it) — never
+  treat an XDF-declared max as a guard on these tables. Overboost-fault routing
+  lives in `IP_PUT_AMP_DIF_MAX_PRS_DIF_THR` — Overboost pressure-difference
+  threshold (int16), **not** `C_PRS_IM_SP_LIM`; the R05 recipe mis-routed it
+  once. Detail and exact figures: `knowledge/ecu-tuning-basics.md`.
 
 ## Always name tables by ID + plain-English description
 

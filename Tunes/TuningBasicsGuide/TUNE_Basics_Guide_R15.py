@@ -1,47 +1,71 @@
 #!/usr/bin/env python3
-"""TuningBasicsGuide R14 — add a stock map and order the slots least→most.
+"""TuningBasicsGuide R15 — walk back R08's wastegate deepening where it now under-delivers.
 
-R14 is the first calibration change written in the `simoscal.tune` API (R13 was
-a byte-identical re-declaration of R12). It changes **only the switch-patch slot
-assignments** — no base-calibration table moves. The shared base tune (knock
-retard, lambda enrichment, wastegate feedforward, limiters, P0234 threshold) is
-identical to R12/R13.
+R15 changes **one thing**: five cells of `IP_FAC_BPA_SP[0]` / `[1]` — Wastegate
+Position Feedforward, VVL 0 / VVL 1 move back toward their R07 values. Every
+other table — the slot assignments R14 introduced, timing, fuelling, limiters,
+the P0234 threshold, the compressor cap — is byte-identical to R14.
 
-What changes, and why:
+Why:
 
-    R13 slots               R14 slots
-    1  conservative         1  stock        (new — ~21.6 psi flat)
-    2  intermediate         2  conservative (~24.5 psi)
-    3  aggressive           3  intermediate (~24.5 psi, held)
-    4  conservative (dup)   4  aggressive   (~26.0 psi)
-    5  valet                5  valet        (~10 psi, unchanged)
+* The R14 logs (`Logs/BasicsGuide_R14/log_review.md`, Medium 2) show slot 4
+  delivering up to **1.5 psi short** of its 26 psi target at 4000-4500 rpm,
+  narrowing to on-target by redline, while `WG I Value` climbs from +0.7 % to
+  +17.8 % with rpm. The closed loop is spending its integral doing feedforward's
+  job, which is the signature of a feedforward base that is too **open** at high
+  flow for the target it now has to serve.
 
-Two things motivated it:
+* The cells carrying that shortfall are **exactly the six R08 lowered**, still
+  at R08's values. R08 opened them to cut a measured top-end overboost against
+  the R08-era targets; R10 then unclamped `IP_PQ_CHA_MAX` — Maximum allowed
+  pressure quotient at turbo charger compressor, and R14 put the aggressive
+  curve on slot 4. The overboost R08 was correcting no longer exists, so its
+  edit now reads as a shortfall. R15 is therefore a *walk-back of a specific
+  prior edit*, not a fresh reshape — a much better-bounded change.
 
-* **A stock map.** On a switch-patched bin only the 24 per-slot tables differ
-  between slots; the base calibration is shared. So a "stock" slot can only
-  revert the per-slot **boost target** to the factory `IP_PUT_SP` — Pressure up
-  throttle setpoint value (~21.6 psi gauge), not the whole ECU — it still runs
-  the shared tuned base underneath. That is a genuine low-boost daily / safety
-  map, and it is the most stock a single slot can be. Its curve is read live
-  from the stock recovery bin (see `_stock_full_load_curve`), so it is provably
-  the factory target rather than a transcribed number.
+How it was sized (`Logs/BasicsGuide_R14/size_r15_wastegate.py`):
 
-* **Ordering.** Slots 1→4 now run least → most aggressive, which also retires
-  the redundant duplicate the old slot 4 carried (a second copy of slot 1).
-  Slot 5 stays the valet cap, parked outside the performance ladder on purpose.
+Commanded feedforward position is a bilinear-weighted sum of table cells, so the
+position change in an rpm band is linear in the cell deltas. The sizing script
+builds that design matrix from the logged operating points and solves a bounded
+least squares against the per-band shortfall, at the guide's ~0.05-position-per-
+psi rule and R08's own ~70 % conservatism factor. Two bounds carry the safety
+argument:
 
-The min() slot semantics are unchanged: the base `IP_PUT_SP` ceiling stays
-parked non-binding at 30 psi and each slot's grid is the thing that actually
-caps boost, so every slot curve must sit below that ceiling (the library
-enforces it).
+* **Never above the R07 value.** R08's deltas are the upper bound, so R15 can at
+  most undo R08 in a cell — it can never write a more-closed feedforward than
+  this lineage has already run and logged.
+* **Never negative.** R15 only walks back. The Int 0.75 rows are excluded
+  outright: they carry the upshift-overboost load (log review High 1), which
+  cannot be sized because the `PUT` channel railed during the only instance.
 
-Because this is a real calibration change, **R14 is a starting point, not a
-finished tune** — flash it, log it (drive each slot so the reorder is confirmed
-in-car), review, iterate. A switch-patched bin must be flashed **FULL**, not
-CAL-only, when the patch set is being installed or changed; on this car the R07
-patch set is already installed, so a CAL flash is eligible for this
-calibration-only change (see REV_LOG.md).
+The already-correct 6000-6500 rpm band (-1.0 kPa) is weighted up in the solve so
+the edit does not push a band that is right into overshoot to buy a little more
+elsewhere. Predicted result over the logged points, per rpm band:
+
+    band        R14 actual   R15 predicted
+    3500-4000     -5.5 kPa      -2.9 kPa
+    4000-4500    -10.4 kPa      -7.2 kPa
+    4500-5000     -6.5 kPa      -4.1 kPa
+    5000-5500     -7.9 kPa      -4.5 kPa
+    5500-6000     -5.5 kPa      -2.0 kPa
+    6000-6500     -1.0 kPa      +1.4 kPa
+
+That recovers roughly half the shortfall, on purpose. Fully closing it would
+need cells more closed than R07, which is not justified on one session's logs
+and would push airmass through a fuel system that already runs 96-98 % HPFP
+effective volume through the shelf zone. If the next logs still show a gap, R16
+can go past R07 with evidence.
+
+**Primary watch item for the validation logs: fuel.** This edit adds boost where
+the high-pressure pump has least headroom. It adds least there by construction
+(+0.46 psi at 4000-4500, the tightest band), but HPFP effective volume and DI
+rail hold are what decide whether R15 stands.
+
+Because this is a real calibration change, **R15 is a starting point, not a
+finished tune** — flash it, log it, review, iterate. On this car the R07 patch
+set is already installed and R15 moves calibration bytes only, so a CAL flash is
+eligible (see REV_LOG.md).
 
 Revision history (see REV_LOG.md):
     R00 — Base ecu-tuning-basics SOP plus the lambda axis re-breakpoint
@@ -79,6 +103,10 @@ Revision history (see REV_LOG.md):
           (1 stock, 2 conservative, 3 intermediate, 4 aggressive); slot 5 valet
           unchanged. Only the four per-slot `PUT setpoint` grids move; the shared
           base calibration is identical to R13/R12.
+    R15 — Walk back R08's wastegate deepening in the five feedforward cells the
+          R14 logs show under-delivering, bounded at the R07 values. Slot-4
+          tracking was 1.5 psi short at 4000-4500 rpm with the WG integral
+          carrying +18 %. Only `IP_FAC_BPA_SP[0]` / `[1]` move.
 """
 
 from __future__ import annotations
@@ -108,13 +136,13 @@ XDF_PATH = CODE_ROOT / "xdf" / "SC8S50.V1.0.xdf"
 BIN_PATH = CODE_ROOT / "bin" / "5G0906259L__0002.bin"       # stock recovery image
 SWITCH_XDF = BINTOOLZ / "definitions" / "S50 Switch Patch.29.33.V2.xdf"
 OUT_ROOT = Path(__file__).resolve().parent / "TUNE_Basics_Guide_out"
-OUT_BIN_NAME = "CB_HSL_SP2933_5G0906259L_0002_BasicsGuide_R14.bin"
+OUT_BIN_NAME = "CB_HSL_SP2933_5G0906259L_0002_BasicsGuide_R15.bin"
 
-#: The approved R13 output (byte-identical to R12). R14's byte audit is against
-#: this: only the four reordered slot grids and the checksums may differ.
-R13_REFERENCE = (
-    OUT_ROOT / "R13_20260719-213357"
-    / "CB_HSL_SP2933_5G0906259L_0002_BasicsGuide_R13.bin"
+#: The flashed-and-logged R14 output. R15's byte audit is against this: only the
+#: two wastegate feedforward maps and the checksums may differ.
+R14_REFERENCE = (
+    OUT_ROOT / "R14_20260810-111002"
+    / "CB_HSL_SP2933_5G0906259L_0002_BasicsGuide_R14.bin"
 )
 
 PATCHES = (
@@ -194,6 +222,21 @@ WG_DELTAS_R08 = {
     (7, 14): -0.06, (7, 15): -0.04,
     (8, 14): -0.06, (8, 15): -0.04,
 }
+# R15: the R14 logs invert R08's premise — the top end now *under*-delivers by up
+# to 1.5 psi with the WG integral carrying +18 %, because R10 unclamped the
+# compressor cap and R14 gave slot 4 the aggressive curve. These are R08's own
+# cells, walked back toward R07 by a bounded least squares against the measured
+# per-band shortfall (Logs/BasicsGuide_R14/size_r15_wastegate.py). Every value is
+# capped at its R07 level: R15 can undo R08, never exceed it. (8, 14) solved to
+# zero and is deliberately left at its R08 value; the Int 0.75 rows are untouched
+# because they carry the un-sizable upshift-overboost load.
+WG_DELTAS_R15 = {
+    (6, 14): +0.020,   # Int 0.90 x Exh 1.00: 0.655 -> 0.675  (= R07)
+    (6, 15): +0.020,   # Int 0.90 x Exh 1.40: 0.610 -> 0.630  (= R07)
+    (7, 14): +0.060,   # Int 1.05 x Exh 1.00: 0.540 -> 0.600  (= R07)
+    (7, 15): +0.010,   # Int 1.05 x Exh 1.40: 0.525 -> 0.535  (R07 is 0.565)
+    (8, 15): +0.040,   # Int 1.25 x Exh 1.40: 0.475 -> 0.515  (= R07)
+}
 
 # --------------------------------------------------------------------------- #
 # Boost — limiters, the compressor cap, and the parked base ceiling
@@ -218,7 +261,7 @@ SLOT_RPM_AXIS = (3000, 3200, 3400, 3800, 4400, 4700, 5000, 5400, 5750, 6000, 625
 
 # The three tuned shapes are the R09-lineage curves, resampled onto the finer
 # shared slot axis. Clamped-linear, so the anchors are preserved exactly and
-# nothing is invented between them. Unchanged from R13.
+# nothing is invented between them. Unchanged from R14.
 _R09_AXIS_OLD = [2000.0, 3000.0, 4000.0, 5000.0, 5750.0, 6500.0]
 _R09_TOPROW_OLD = [2699.0, 2699.0, 2500.0, 2350.0, 2299.0, 2199.0]
 _R09_AXIS_NEW = [3000.0, 3400.0, 4400.0, 5000.0, 5750.0, 6500.0]
@@ -235,7 +278,7 @@ def _stock_full_load_curve(rpm_axis: tuple[float, ...]) -> np.ndarray:
     """Stock full-load boost target, resampled onto the slot rpm axis.
 
     Read live from the stock recovery bin's `IP_PUT_SP` — Pressure up throttle
-    setpoint (highest load row), so the R14 "stock" slot is provably the factory
+    setpoint (highest load row), so the stock slot is provably the factory
     target (~2502–2506 hPa absolute, ~21.6 psi gauge) rather than a transcribed
     number. Clamped-linear onto the 12-point slot axis.
     """
@@ -250,12 +293,12 @@ SLOT_STOCK = _stock_full_load_curve(SLOT_RPM_AXIS)
 
 VALET_SLOT, VALET_CAP_PSI = 5, 10.0
 
-# R14 ordering: slots 1→4 least → most aggressive; slot 5 valet (fixed).
+# R14 ordering, unchanged: slots 1→4 least → most aggressive; slot 5 valet.
 SLOT_CURVES = {
     1: SLOT_STOCK,            # stock factory boost target (~21.6 psi)
     2: SLOT_CONSERVATIVE,     # conservative (~24.5 psi, ramps down)
     3: SLOT_INTERMEDIATE,     # intermediate (~24.5 psi, held then taper)
-    4: SLOT_AGGRESSIVE,       # aggressive (~26 psi — the former R09/R10 shelf)
+    4: SLOT_AGGRESSIVE,       # aggressive (~26 psi — the log-validated slot)
     # slot 5 is the valet cap, declared in psi so the library floors it
 }
 SLOT_LABELS = {
@@ -266,21 +309,32 @@ SLOT_LABELS = {
 }
 
 SUMMARY = """\
-R14 adds a **stock map** on slot 1 and orders the drivable slots least→most
-aggressive: 1 stock (~21.6 psi, factory `IP_PUT_SP` target read live from the
-stock bin), 2 conservative (~24.5), 3 intermediate (~24.5 held), 4 aggressive
-(~26). Slot 5 remains the ~10 psi valet cap. Only the four per-slot `PUT
-setpoint` grids move — the shared base calibration (timing, fuelling, wastegate,
-limiters) is byte-identical to R13/R12. A stock **slot** reverts only the
-per-slot boost target, not the shared tuned base, so slot 1 runs stock boost
-over the same tuned foundation as the others. Starting point, not a finished
-tune: flash, drive each slot, log, review, iterate.
+R15 walks back **R08's wastegate feedforward deepening** in the five cells the
+R14 logs show under-delivering. Slot 4 tracked up to **1.5 psi short** of its
+26 psi target at 4000-4500 rpm while `WG I Value` climbed to +17.8 % — the
+closed loop doing feedforward's job. Those cells are exactly the six R08
+lowered: R08 opened them to cut an overboost that R10 (compressor cap) and R14
+(slot-4 curve) have since removed, so its edit now reads as a shortfall.
+
+Deltas were solved, not guessed — commanded position is linear in the cells, so
+a bounded least squares against the measured per-band shortfall gives them, at
+the guide's 0.05-position-per-psi rule and R08's own ~70 % conservatism. **Every
+value is capped at its R07 level**: R15 can undo R08 in a cell, never write a
+more-closed feedforward than this lineage has run. The Int 0.75 rows are left
+alone — they carry the upshift-overboost load, which cannot be sized while the
+`PUT` channel rails.
+
+This recovers roughly half the shortfall on purpose. Watch **fuel** on the
+validation logs: HPFP effective volume already runs 96-98 % through the shelf
+zone, and this edit adds boost there. Only `IP_FAC_BPA_SP[0]` / `[1]` move —
+slot assignments, timing, fuelling and limiters are byte-identical to R14.
+Starting point, not a finished tune.
 """
 
 
 def declare(tune: Tune) -> None:
-    """The complete calibration, in the order the ECU layers it. Only the
-    switch-patch slot assignments differ from R13/R12."""
+    """The complete calibration, in the order the ECU layers it. Only the two
+    wastegate feedforward maps differ from R14."""
     # -- Fueling: axes first, so the guide's grid lands on the loads it was
     #    authored for, then the recipe can write HPDI/MPI without mismatching.
     tune.fueling.rebreakpoint_lambda_axes(
@@ -329,13 +383,21 @@ def declare(tune: Tune) -> None:
         intent="pull timing at the R01/R04 measured knock pockets, blended so there is no cliff",
     )
 
-    # -- Wastegate: unclamp the top of the map, then the two log-driven overlays.
+    # -- Wastegate: unclamp the top of the map, then the log-driven overlays in
+    #    lineage order. R15's overlay is the only one that closes cells: it walks
+    #    R08 back where the R14 logs show that edit now costing boost.
     tune.wastegate.exh_flow_axis_last(
         EXH_FLOW_AXIS_TOP,
         intent="extend the exhaust-flow axis top to 1.40 (logged flow reaches ~1.33)",
     )
     tune.wastegate.overlay(WG_DELTAS_R05, intent="R05 overboost-ridge overlay")
     tune.wastegate.overlay(WG_DELTAS_R08, intent="R08 top-end deepening")
+    tune.wastegate.overlay(
+        WG_DELTAS_R15,
+        intent="R15 walk-back of R08 in the five cells the R14 logs show "
+               "under-delivering (bounded at the R07 values, solved against the "
+               "measured per-band shortfall)",
+    )
 
     # -- Boost: P0234 margin, then park the base ceiling on the R09 axis.
     tune.boost.overboost_threshold(
@@ -356,8 +418,7 @@ def declare(tune: Tune) -> None:
     )
 
     # -- Switch patch: shared axis, the four tuned/stock slots ordered
-    #    least→most aggressive, then the valet cap. Every slot sits below the
-    #    parked base ceiling, which is what makes the parked ceiling safe.
+    #    least→most aggressive, then the valet cap. Unchanged from R14.
     tune.switchpatch.slot_rpm_axis(
         SLOT_RPM_AXIS,
         intent="set the shared switch-patch slot rpm axis to the fine 12-point grid",
@@ -383,8 +444,8 @@ def declare(tune: Tune) -> None:
 
 
 def main() -> None:
-    if not R13_REFERENCE.is_file():
-        raise SystemExit(f"Missing the R13 reference bin: {R13_REFERENCE}")
+    if not R14_REFERENCE.is_file():
+        raise SystemExit(f"Missing the R14 reference bin: {R14_REFERENCE}")
 
     tune = Tune.open(
         SC8S50, xdf=XDF_PATH, bin=BIN_PATH, patches=PATCHES,
@@ -393,21 +454,21 @@ def main() -> None:
     declare(tune)
 
     result = build(
-        tune, "R14", out_root=OUT_ROOT, bin_name=OUT_BIN_NAME,
-        reference_bin=R13_REFERENCE,
-        title="TUNE_Basics_Guide_R14 — stock map added, slots ordered least→most",
+        tune, "R15", out_root=OUT_ROOT, bin_name=OUT_BIN_NAME,
+        reference_bin=R14_REFERENCE,
+        title="TUNE_Basics_Guide_R15 — wastegate feedforward walked back toward R07",
         summary=SUMMARY,
     )
 
-    print(f"R14 saved  : {result.bin_path}")
-    print(f"R14 report : {result.report_path}")
-    print(f"R14 journal: {len(result.journal)} entries; "
+    print(f"R15 saved  : {result.bin_path}")
+    print(f"R15 report : {result.report_path}")
+    print(f"R15 journal: {len(result.journal)} entries; "
           f"{len(result.journal.tables_touched())} tables touched")
-    print(f"R14 audit  : {result.diff.summary()}")
+    print(f"R15 audit  : {result.diff.summary()}")
     print(
-        "\nOnly the four reordered per-slot PUT setpoint grids should differ "
-        "from R13 (plus the two stored checksums). Read report.md and the "
-        "compare/ PNGs before flashing. This script never flashes."
+        "\nOnly IP_FAC_BPA_SP[0] and [1] should differ from R14 (5 cells each, "
+        "plus the stored checksums). Read report.md and the compare/ PNGs "
+        "before flashing. This script never flashes."
     )
 
 
