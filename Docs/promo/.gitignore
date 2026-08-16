@@ -5,3 +5,4 @@ assets/
 *.mp4
 __pycache__/
 .pytest_cache/
+*.wav

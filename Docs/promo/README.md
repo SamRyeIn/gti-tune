@@ -3,8 +3,8 @@
 Two 1920×1080 H.264 cuts of the same story, sharing one engine. Both are built
 from the library's **real** outputs: the deep dive from the tune report and the
 before/after compare surfaces, the hook from the tune bins and the datalogs
-themselves. On-screen text only; no voiceover, no baked audio (so a music bed can
-be dropped on later).
+themselves. On-screen text only, no voiceover; the music bed is synthesised by
+`music.py` and encoded in, so both files play as finished videos.
 
 | Cut           | File                   | Length | What it does                                              |
 |---------------|------------------------|--------|-----------------------------------------------------------|
@@ -20,9 +20,13 @@ Origin: `Docs/brainstorms/2026-07-25-simoscal-promo-video-requirements.md`.
 
 ```bash
 python3 Docs/promo/capture_assets.py    # 1. gather + prepare real stills
-python3 Docs/promo/build_hook.py        # 2a. the 31 s hook   (~10 s)
+python3 Docs/promo/build_hook.py        # 2a. the 31 s hook   (~12 s)
 python3 Docs/promo/build_promo.py       # 2b. the 90 s cut    (~40 min)
 ```
+
+Both bake in the music bed. Pass `--no-music` for a silent cut to drop your own
+track on, or put a fresh bed on a cut you already rendered without re-rendering
+a frame: `python3 Docs/promo/music.py --mux simoscal_promo.mp4 --drop 6`.
 
 `capture_assets.py` is only needed for the deep dive — the hook draws every beat
 itself, out of the logs and the tune bin. Intermediates (`frames/`,
@@ -36,6 +40,7 @@ python3 Docs/promo/hook_data.py                 # print the hook's real figures
 python3 Docs/promo/hook_scenes.py out/          # stills of every hook beat
 python3 Docs/promo/scene_trace.py out/          # stills of the table-walk beat
 python3 Docs/promo/scene_boost.py out/          # stills of the boost beat, + its window
+python3 Docs/promo/music.py /tmp/bed.wav        # the bed on its own, to audition
 python3 Docs/promo/build_hook.py --only dyno    # one beat -> preview_hook_dyno.mp4
 python3 Docs/promo/build_promo.py --only logs   # one beat -> preview_logs.mp4
 python3 Docs/promo/build_promo.py --frames      # keep numbered PNGs in frames/
@@ -57,8 +62,10 @@ beat is the most expensive at ~1.6 s a frame.
 - `FrameWriter` fails if a beat renders the wrong number of frames or writes
   outside its window, so a gap or overlap stops the build before the encode;
 - the encoded file is probed with `ffprobe` and checked for 1920×1080, H.264 /
-  `yuv420p`, the exact expected frame count, a duration inside 85–95 s, and a
-  **single stream** — no audio is ever encoded (`-an`);
+  `yuv420p`, the exact expected frame count, a duration inside 85–95 s, and its
+  streams: with music, exactly one video and one **aac** stream, so a bed that
+  silently failed to mux fails the build; with `--no-music`, that any audio at
+  all is an error;
 - the hero beat prints which path it took (`rotation` = the real table
   re-plotted from the bins, `parallax` = fallback on the compare PNG).
 
@@ -76,6 +83,12 @@ with it), and prints which revisions were excluded from the chart.
 The hook puts big figures on screen, so `hook_data.py` derives them under rules
 worth stating (it prints all of this when run directly):
 
+- **`Calc HP` is an estimate, and the video says so.** It is a SimosTools
+  *calculated* PID — address `0xffffffff`, equation `hp`, the same family as
+  `Calc 1/4mile` — which the app derives from logged acceleration and gear ratio.
+  It is not read off an ECU address and it is not a dyno figure, so no beat may
+  call it measured. The dyno beat's kicker is "ESTIMATED, NOT A DYNO" and both hp
+  beats name the source in their provenance line.
 - **Detected WOT pulls only** — pull windows come from `simoscal.analysis`, the
   same detector the log reviews use, not a max over the whole file.
 - **In-gear samples only.** `Calc HP (hp)` is acceleration-derived *and*
@@ -129,6 +142,7 @@ the honest figure.
 | `hook_scenes.py`    | The hook's dyno/climb/logo beats, and the dispatch for all seven |
 | `scene_trace.py`    | The tach + live table-walk beat                                 |
 | `scene_boost.py`    | Six revisions of logged boost vs rpm, swept                     |
+| `music.py`          | The synthesised bed — also muxes one onto an existing cut       |
 | `scene_slots.py`    | The five map-switch slot boost curves, read out of the tune bin |
 | `build_hook.py`     | Hook: render → ffmpeg → mp4, sharing the deep dive's QA gates   |
 | `tests/`            | `python3 -m pytest Docs/promo/tests -q`                         |
@@ -190,6 +204,28 @@ and cell attribution uses the nearest-breakpoint rule from
 `simoscal.analysis.coverage` against breakpoints read out of the flashed R14
 bin. Orange in that table means "the log hit this cell" — the table's own
 shading is deliberately a cool ramp so the two never get confused.
+
+## The music
+
+`music.py` synthesises the bed rather than sourcing one. A downloaded "free"
+track carries a licence to keep track of, an attribution line, and a takedown
+risk on a video meant to be shared; this one is numpy and the stdlib `wave`
+module, so it is original by construction and there is no asset to lose. No new
+dependency — it is the numpy `simoscal` already uses.
+
+A minor, 96 BPM: sub bass on the downbeats, a slow detuned pad through a cheap
+two-tap reverb, quiet offbeat hats, and a kick that side-chain ducks the pad
+under it. Deterministic (`seed=7`), so the same build makes the same track.
+
+It is **cut to the video**. A bar is 2.5 s and the drums come in at the cut's
+second beat — 3 s for the hook, `--drop 6` for the deep dive — so every later cut
+in the timeline lands on a two-bar downbeat and the chord changes with the beat
+on screen. `bed_for()` reads that from the timeline, so a re-cut moves the music
+with it instead of drifting out of sync.
+
+Levels: peak lands near −2.7 dBFS in the encoded file and RMS near −19, which is
+a bed you can talk over. `PEAK_TARGET` is deliberately well under full scale
+because AAC overshoots on encode — at the first pass it came back at −0.3 dBFS.
 
 ## Requirements
 

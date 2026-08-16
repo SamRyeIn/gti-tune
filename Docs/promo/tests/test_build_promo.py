@@ -106,4 +106,7 @@ def test_build_refuses_to_run_without_the_prepared_assets(monkeypatch, tmp_path)
 @pytest.mark.skipif(not config.OUT_MP4.is_file(),
                     reason="run `python3 Docs/promo/build_promo.py` first")
 def test_the_built_promo_matches_the_spec():
-    assert B.qa(config.OUT_MP4, config.total_frames(), full_build=True) == []
+    # The cut now ships with the generated music bed on it (`music.py`), so the
+    # gate expects an aac stream where it used to forbid any audio at all.
+    assert B.qa(config.OUT_MP4, config.total_frames(), full_build=True,
+                expect_audio=True) == []

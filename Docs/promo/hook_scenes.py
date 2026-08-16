@@ -31,13 +31,17 @@ MARGIN = 130
 
 # ---------------------------------------------------------------------- copy
 
-DYNO_KICKER = "MEASURED, NOT MODELLED"
+DYNO_KICKER = "ESTIMATED, NOT A DYNO"
 CLIMB_KICKER = "SIX REVISIONS"
 WORDMARK = ("simos", "cal")
 TAGLINE = "Tune a Simos18 ECU. In code."
 CLOSER = "Python in. Checksum-verified .bin out. You flash it."
 
-# Said out loud rather than hidden: which pull these numbers come from.
+# Said out loud rather than hidden: which pull these numbers come from, and
+# what kind of number they are. `Calc HP` / `Calc TQ` are SimosTools *calculated*
+# PIDs (address 0xffffffff, like `Calc 1/4mile`) — the app derives them from
+# logged acceleration and gear ratio. They are not read off an ECU address and
+# they are not a dyno, so nothing on screen may call them measured.
 PROVENANCE = "peak of a logged 3rd-gear WOT pull · SimosTools datalog · 2017 VW GTI"
 
 
@@ -49,7 +53,7 @@ def _kicker(f: Frame, text: str, t_in: float, color: str = "accent") -> None:
 
 def _provenance(f: Frame, alpha: float, text: str = PROVENANCE) -> None:
     f.text(text, (MARGIN, config.HEIGHT - 96), size=26, color="text_faint",
-           tracking=3, alpha=alpha)
+           tracking=3, max_width=1200, alpha=alpha)
 
 
 # -------------------------------------------------------------- beat 1 · dyno
@@ -139,8 +143,9 @@ def dyno_frame(i: int, n: int) -> Frame:
                tracking=8, alpha=tq_t)
 
     _provenance(f, C.ease_out(C.sub(t, 0.7, 0.9)),
-                f"{d.headline.rev} · 3rd-gear WOT pull · "
-                f"{rpm[0]:,.0f}–{rpm[-1]:,.0f} rpm · smoothed peak")
+                f"{d.headline.rev} · SimosTools Calc HP — the app's estimate from "
+                f"logged acceleration and gear ratio, not a dyno · 3rd-gear WOT "
+                f"pull, {rpm[0]:,.0f}–{rpm[-1]:,.0f} rpm · smoothed peak")
     f.vignette(0.38)
     return f
 
@@ -210,7 +215,8 @@ def climb_frame(i: int, n: int) -> Frame:
            color="text_dim", tracking=4, alpha=C.ease_out(C.sub(t, 0.66, 0.86)))
 
     _provenance(f, appear,
-                "each bar is that revision's best logged 3rd-gear pull to redline")
+                "each bar is that revision's best logged 3rd-gear pull to redline · "
+                "SimosTools Calc HP, estimated from acceleration — not a dyno")
     f.vignette(0.34)
     return f
 

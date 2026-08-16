@@ -23,6 +23,7 @@ import build_promo
 import compositor as C
 import config
 import hook_scenes
+import music
 from hook_data import hook_data
 
 FRAME_DIR = config.PROMO_DIR / "frames_hook"
@@ -34,7 +35,7 @@ _HOOK_S = config.hook_total_frames() / config.FPS
 DURATION_MIN_S, DURATION_MAX_S = _HOOK_S - 0.5, _HOOK_S + 0.5
 
 
-def _ffmpeg_cmd(out_path: Path, source: str) -> list[str]:
+def _ffmpeg_cmd(out_path: Path, source: str, audio: Path | None = None) -> list[str]:
     if source == "pipe":
         inputs = ["-f", "rawvideo", "-pix_fmt", "rgb24",
                   "-s", f"{config.WIDTH}x{config.HEIGHT}",
@@ -42,17 +43,23 @@ def _ffmpeg_cmd(out_path: Path, source: str) -> list[str]:
     else:
         inputs = ["-framerate", str(config.FPS),
                   "-i", str(FRAME_DIR / "frame_%05d.png")]
+    if audio is None:
+        track = ["-an"]                         # no audio stream at all
+    else:
+        track = ["-i", str(audio), "-map", "0:v:0", "-map", "1:a:0",
+                 "-c:a", "aac", "-b:a", "192k", "-shortest"]
     return [
         build_promo.FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
         *inputs,
-        "-an",                                  # no audio stream at all
+        *track,
         "-c:v", "libx264", "-preset", "medium", "-crf", "18",
         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
         str(out_path),
     ]
 
 
-def render(beats: tuple[config.Beat, ...], out_path: Path, keep_frames: bool) -> int:
+def render(beats: tuple[config.Beat, ...], out_path: Path, keep_frames: bool,
+           audio: Path | None = None) -> int:
     if build_promo.FFMPEG is None:
         raise SystemExit("ffmpeg not found on PATH — install it (brew install ffmpeg)")
 
@@ -63,7 +70,8 @@ def render(beats: tuple[config.Beat, ...], out_path: Path, keep_frames: bool) ->
         sink = C.PngSink(FRAME_DIR)
         proc = None
     else:
-        proc = subprocess.Popen(_ffmpeg_cmd(out_path, "pipe"), stdin=subprocess.PIPE)
+        proc = subprocess.Popen(_ffmpeg_cmd(out_path, "pipe", audio),
+                                stdin=subprocess.PIPE)
         sink = C.RawPipeSink(proc.stdin)
 
     writer = C.FrameWriter(sink)
@@ -80,18 +88,19 @@ def render(beats: tuple[config.Beat, ...], out_path: Path, keep_frames: bool) ->
         if proc.wait() != 0:
             raise SystemExit(f"ffmpeg failed with exit code {proc.returncode}")
     else:
-        subprocess.run(_ffmpeg_cmd(out_path, "png"), check=True)
+        subprocess.run(_ffmpeg_cmd(out_path, "png", audio), check=True)
 
     print(f"  rendered {writer.count} frames in {time.time() - started:.1f} s")
     return writer.count
 
 
-def qa(path: Path, expected_frames: int, full_build: bool) -> list[str]:
+def qa(path: Path, expected_frames: int, full_build: bool,
+       expect_audio: bool = False) -> list[str]:
     """Same checks as the long cut, against the hook's own duration window."""
     lo, hi = build_promo.DURATION_MIN_S, build_promo.DURATION_MAX_S
     build_promo.DURATION_MIN_S, build_promo.DURATION_MAX_S = DURATION_MIN_S, DURATION_MAX_S
     try:
-        return build_promo.qa(path, expected_frames, full_build)
+        return build_promo.qa(path, expected_frames, full_build, expect_audio)
     finally:
         build_promo.DURATION_MIN_S, build_promo.DURATION_MAX_S = lo, hi
 
@@ -102,6 +111,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="write numbered PNGs into frames_hook/ instead of piping")
     ap.add_argument("--only", metavar="BEAT", choices=list(config.HOOK_BEATS),
                     help="render a single beat to preview_hook_<beat>.mp4")
+    ap.add_argument("--no-music", action="store_true",
+                    help="encode silent, for dropping your own track on instead")
     args = ap.parse_args(argv)
 
     if args.only:
@@ -118,13 +129,24 @@ def main(argv: list[str] | None = None) -> int:
           f"{d.headline.tq:.0f} Nm / {d.headline.boost:.1f} psi  "
           f"(+{d.hp_gain:.0f} hp over {d.baseline.rev})", flush=True)
 
-    count = render(beats, out_path, keep_frames=args.frames)
+    # Silent for a single-beat preview: the bed is cut to the whole timeline, so
+    # a slice of it would start in the wrong bar.
+    bed_path = None
+    if not (args.only or args.no_music):
+        bed_path = music.write_wav(music.bed_for(config.HOOK_TIMELINE),
+                                   config.PROMO_DIR / "bed_hook.wav")
+        print(f"  music bed: {bed_path.name}, drops at "
+              f"{config.HOOK_TIMELINE[1].start_s:.0f} s with the first data beat",
+              flush=True)
+
+    count = render(beats, out_path, keep_frames=args.frames, audio=bed_path)
     expected = sum(b.n_frames for b in beats)
     if count != expected:
         raise SystemExit(f"wrote {count} frames, expected {expected}")
 
     print("QA:")
-    problems = qa(out_path, expected, full_build=not args.only)
+    problems = qa(out_path, expected, full_build=not args.only,
+                  expect_audio=bed_path is not None)
     for x in d.excluded:
         print(f"  excluded {x['rev']}: {x['reason']}")
     for rev in d.boost_missing:
