@@ -184,7 +184,8 @@ every revision whose pull window caught a flip was inflated the same way.
 
 So before peaking, curving, or plotting either channel over a pull, drop the rows
 where the gear channel is not the pull's attributed gear
-(`round(gear) == pull.gear`). Reference implementation:
-`Docs/promo/hook_data.py::_in_gear`. The old rule of thumb that a 2nd-gear pull
+(`round(gear) == pull.gear`). There is no shared implementation of this trim —
+`simoscal.analysis` does not do it, so any script quoting either channel must do
+it itself. The old rule of thumb that a 2nd-gear pull
 reads high was this artifact rather than gearing — trimmed, 2nd and 3rd agree to
 within ~4 hp on the same session.
