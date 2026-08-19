@@ -36,7 +36,7 @@ them) and **Claude-maintained** (Claude writes/updates; human reviews).
 | `Logs/`            | Human drop → Claude-analyzed | SimosTools datalog CSVs per flashed revision + `log_review.md`        |
 | `PIDs/`            | Human drop zone              | SimosTools logging-list CSVs (PID definitions) + PID List Editor      |
 | `Troubleshooting/` | Human drop → Claude-analyzed | Check-engine / fault info Sam drops in (codes, notes) by topic        |
-| `Docs/`            | Mixed                        | Human: source `.docx` guides; Claude: `plans/`, `brainstorms/`        |
+| `Docs/`            | Mixed                        | Human: `.docx` guides (untracked); Claude: `plans/`, `brainstorms/`   |
 | `knowledge/`       | Claude-maintained            | The wiki: ingested reference notes + `media/<note>/` screenshots      |
 | `References/`      | Human drop zone              | External material: Funktionsrahmen PDF, Cobb links, example logs      |
 | `BinToolz-main/`   | Vendored third-party         | BinToolz tool + `.btp` patches — reference only, do not edit          |
@@ -44,7 +44,7 @@ them) and **Claude-maintained** (Claude writes/updates; human reviews).
 
 Notes:
 
-- The project root is a git repository (private remote `gti-tune`) holding the
+- The project root is a git repository (public remote `gti-tune`) holding the
   car-specific tuning work. `Code/` is a separate, nested-but-independent repo
   (`simoscal` library, remote `SamRyeIn/simoscal`) and is gitignored by the
   root repo, as are third-party material (`BinToolz-main/`, `References/`),

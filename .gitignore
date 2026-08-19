@@ -20,3 +20,6 @@ __pycache__/
 ~$*
 .obsidian/workspace*
 .claude/settings.local.json
+
+# Third-party tuning guides (source .docx) — kept locally, not redistributed
+Docs/*.docx
