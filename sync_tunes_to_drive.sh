@@ -23,7 +23,31 @@ set -euo pipefail
 
 REPO="/Users/sam/SimosTools"
 TUNES_DIR="$REPO/Tunes"
-DRIVE="/Users/sam/Library/CloudStorage/GoogleDrive-samryan1021@gmail.com/My Drive/Simos Tools/simoscal tunes"
+# The Drive folder is discovered, not hardcoded. macOS names the CloudStorage
+# mount after the account's email address, and this repository is public — so a
+# literal path here publishes that address. Override with SIMOSCAL_DRIVE to point
+# at a different account, a second Drive, or a scratch folder for testing.
+DRIVE_SUBPATH="My Drive/Simos Tools/simoscal tunes"
+if [[ -n "${SIMOSCAL_DRIVE:-}" ]]; then
+    DRIVE="$SIMOSCAL_DRIVE"
+else
+    DRIVE=""
+    for candidate in "$HOME/Library/CloudStorage/GoogleDrive-"*; do
+        [[ -d "$candidate/$DRIVE_SUBPATH" ]] || continue
+        if [[ -n "$DRIVE" ]]; then
+            echo "sync_tunes_to_drive: more than one mounted Google Drive account has a" >&2
+            echo "  '$DRIVE_SUBPATH' folder. Set SIMOSCAL_DRIVE to the one you mean." >&2
+            exit 1
+        fi
+        DRIVE="$candidate/$DRIVE_SUBPATH"
+    done
+    if [[ -z "$DRIVE" ]]; then
+        echo "sync_tunes_to_drive: no mounted Google Drive account has a" >&2
+        echo "  '$DRIVE_SUBPATH' folder. Mount Drive in Finder, or set SIMOSCAL_DRIVE" >&2
+        echo "  to the folder to back up into." >&2
+        exit 1
+    fi
+fi
 PATCHED_DIR="$DRIVE/patched"
 
 DRY_RUN=0
