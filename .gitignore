@@ -12,6 +12,11 @@ References/
 # ECU binaries (VW firmware-derived; regenerable from scripts + stock bin)
 *.bin
 
+# XDF definitions — third-party, not ours to redistribute (LICENSE-THIRD-PARTY).
+# References/ and BinToolz-main/ are already ignored wholesale; this catches an
+# XDF dropped anywhere else in the tree. This remote is public.
+*.xdf
+
 # Python bytecode
 __pycache__/
 
