@@ -4,7 +4,7 @@ Date: 2026-08-22
 Type: feat
 Origin: [[2026-08-22-other-file-structures-requirements]]
 Depth: Deep (8 units, `simoscal` library only)
-Status: in execution — U1–U5 complete (2026-08-24), U6–U8 outstanding
+Status: in execution — U1–U6 complete (2026-08-24), U7–U8 outstanding
 
 ## Summary
 
@@ -332,6 +332,47 @@ arithmetic from the S50 values.
 
 **Verification** — Both patch profiles resolve against their own XDFs and neither
 resolves against the other's.
+
+> [!note] Amended 2026-08-24, after U6 landed
+> The unverified precondition resolved in the cheapest possible direction, and it
+> changed the shape of the unit. `S50 Switch Patch.29.33.V2.xdf` and
+> `A05 Switch Patch.29.33.V2.xdf` are the **same generated file** — identical byte
+> length, 185 tables each, and index for index the same title, A2L symbol and
+> category path. They differ in `<deftitle>`, the timestamp, six table shapes, and
+> the addresses. So the 185 tables do cover all 92 specs' semantics, and the role
+> mapping is that shared ordering rather than 92 judgement calls.
+>
+> That made the "dominant cost in this plan" the smallest unit in it, and moved
+> the work to where the risk actually was:
+>
+> * The address book is **derived and then checked**, not transcribed. `test_f8`
+>   re-runs the pairing from both XDFs and compares it to the committed constants.
+> * Arithmetic was ruled out by measurement, not by principle: the A05 offsets are
+>   three deltas (`+0x12F60`, `+0x13000`, `+0x13020`), so the most common one would
+>   place 25 of the 92 wrong — and all 92 would still *resolve*, because these bind
+>   by uniqueid.
+> * The prose is **not duplicated**. What a table does is a fact about the patch,
+>   not the car, so `switchpatch_2933.py` keeps the descriptions and gained
+>   `build_switch_patch_profile()`; `switchpatch_2933_a05.py` is 92 uniqueids.
+>
+> Scope added beyond the unit as written, because the map is unusable without it:
+> a patch profile cannot be *selected* by resolution the way a base profile is
+> (bound by address, a wrong map can resolve rather than miss), so `PATCH_PROFILES`
+> keys the patch map to the base profile preflight already matched, and preflight
+> and the bridge follow it. A car with no patch map now reports "could not look"
+> rather than "no patch in this bin".
+>
+> Findings worth carrying: all 92 tables exist on A05 at identical shapes, so
+> nothing is declared unavailable — but six of the 185 patch tables *are* (16, 18)
+> against S50's (16, 16) (the flex-fuel `Spark modifier` grids), and a revision
+> that maps those will need per-car shapes. The stock A05 bin reads the whole patch
+> space as zeros, so preflight correctly calls it unapplied. The two patch XDFs
+> share **no** uniqueid at all, which is what makes the cross-resolution test a
+> clean 92-of-92 miss both ways.
+>
+> Also fixed in passing: `probe_foreign.py` — the script section 8 of the porting
+> doc tells the next porter to run first — had been broken since U2 by the
+> `verify()` and `CalFile.open()` signature changes, and never opened a file.
 
 ---
 
