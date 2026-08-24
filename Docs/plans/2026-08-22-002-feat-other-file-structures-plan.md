@@ -4,7 +4,7 @@ Date: 2026-08-22
 Type: feat
 Origin: [[2026-08-22-other-file-structures-requirements]]
 Depth: Deep (8 units, `simoscal` library only)
-Status: ready for execution
+Status: in execution — U1–U5 complete (2026-08-24), U6–U8 outstanding
 
 ## Summary
 
@@ -277,6 +277,28 @@ A profile that declares the wrong shape must still fail resolution.
 **Verification** — AE1 holds: opening the A05 bin and saving with no edits is
 byte-identical.
 
+> [!note] Amended 2026-08-24, after U5 landed
+> The integration criterion held, but only after a finding this unit did not
+> anticipate. `SCGa05_cal.xdf` declares `BASEOFFSET 0` while its addresses are
+> relative to the CAL block at `0x220000` — it is written against an extracted
+> calibration block, not a whole bin (the `_cal` in its name). Read against the
+> 4 MB bin at its declared offset, every value is padding, and a write would
+> land `0x220000` short, outside every range the CAL checksums cover.
+>
+> This is **not** a mismatched bin/XDF pair and not a faulty file: it is a second
+> legitimate addressing convention. The bin and the XDF agree. Rebased by
+> `0x220000`, 214 of 270 candidate breakpoint axes read strictly monotonic
+> (3 at the declared base), `C_PRS_IM_SP_MAX` — Maximum requested intake-manifold
+> pressure setpoint reads 2399.96 hPa against 0, and `ldp_n_ip_put_sp` — PUT
+> setpoint : x axis (engine speed) reads 2000/3000/4000/5000/5750/6500 rpm.
+>
+> U5 first shipped the conservative reading — preflight `BLOCKED` the pairing —
+> and that was then replaced by a per-profile declaration
+> (`Profile.xdf_addresses_cal_relative`) that states the convention as a per-car
+> fact and holds the file to it. The library never infers the convention. A05 is
+> `READY` and `writable=True` as this criterion required, and a file declaring
+> any other offset is still refused.
+
 ---
 
 ### U6. A05 patch profile — 92 specs
@@ -362,6 +384,17 @@ Five of its 20 tests assert behaviour this plan deliberately changes. They are
 shapes differ, ECM3 differs from CAL_CRC in kind), while F2's `INSPECT_ONLY` assertion
 becomes `READY` and F4's patch assertions move to the S50-profile-against-A05 case.
 
+> [!note] Amended 2026-08-24 — done in U5, not deferred to here
+> The F2 and F4c rewrites happened in U5, because the base-offset finding above
+> forced them: F2 went `INSPECT_ONLY` → `BLOCKED` → `READY` within the unit, and
+> the tests that pinned the refusal now pin the *gate* instead, reaching it with
+> a tampered `BASEOFFSET` header since the real file is accepted. What remains for
+> U8 is the F4 patch reassignment (U6's territory) and the AE1–AE8 consolidation.
+> The A05 write byte-audit U8 lists — "edit → build → checksums correct → byte
+> audit shows only the journaled edit plus checksum bytes" — also landed early, as
+> `test_f6_an_a05_edit_lands_in_the_table_and_nowhere_else`: two changed byte runs,
+> the CAL CRC at `0x220304` and the 48-byte table at `0x23F054`.
+
 Add the A05 build acceptance: edit → build → checksums correct → byte audit shows only
 the journaled edit plus checksum bytes.
 
@@ -412,5 +445,21 @@ third box code; the 93 specs from `full-profile-coverage`; a contributor trust m
 ## Open questions
 
 - **Blocking:** U1's outcome. Everything from U5 onward assumes ECM3 is locatable.
+  *Resolved 2026-08-23: ECM3 is at CAL-relative `0x400` on both cars; the block
+  moved, not the header.*
 - **Non-blocking:** whether any of the 10 absent A05 names have equivalents under
-  different symbols, or are genuinely absent on that car. Resolved during U5.
+  different symbols, or are genuinely absent on that car. Resolved during U5 —
+  all 10 are declared in `SCGA05.unavailable` with the reason, and a test asserts
+  each is genuinely absent from the XDF rather than merely unmapped.
+- **Raised and resolved in U5:** which addressing convention a definition file
+  uses. Now a per-profile declaration; see the U5 note above.
+
+  Its consequence for U6 is resolved too. The two A05 files use *different*
+  conventions — the base XDF is CAL-relative, the patch XDF declares
+  `BASEOFFSET 0x220000` and is full-bin — and `_open_shared_space` compared the
+  two files' *declared* offsets, which would have refused the only pairing that
+  car has. It now compares where each file's addresses actually land (and, for
+  the same reason, whether the shared XDF's declared region contains the base
+  space's effective one rather than equalling it). Verified: the A05 base and
+  patch XDFs open over one buffer at effective base `0x220000` and the patch
+  space decodes. U6 starts from a working shared space.
