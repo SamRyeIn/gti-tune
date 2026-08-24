@@ -406,6 +406,45 @@ a sensible target", which was learned on Sam's hardware.
 
 **Verification** — No SC8S50-derived number appears in any A05 output.
 
+> [!note] Amended 2026-08-24, after U7 landed
+> The target was not what the unit as written expected. Reading all six domain
+> modules, the numeric ceilings are already per-car by construction — they are
+> arithmetic against the bin in hand (`_engine_rev_limit` reads the bin,
+> `_require_within_declared` reads the XDF's encodable range) or universal
+> physics bounds (`LAMBDA_FL_LEAN_MAX` is stoich, `WG_OPEN`/`WG_CLOSED` is the
+> actuator's range, `MG_PER_KG` is a unit). Those stay universal: the plan's own
+> distinction is that structural guards travel and calibration advice does not.
+>
+> The real SC8S50 dependency was **table sets**. Four domain modules imported
+> SC8S50's module-global table-name tuples and used them as `tables=` defaults,
+> so every domain call on any bin quietly asserted SC8S50's table sets.
+> `simoscal/bridge.py::_op_limiters` did the same, which rendered SC8S50's table
+> set on an A05 Limiters screen — user-visible output, absorbed into this unit
+> for the reason U6 absorbed `PATCH_PROFILES`.
+>
+> The mechanism mirrors U3's `stock_references`: `Profile.table_sets` +
+> `Profile.table_set(name)`, validated at construction (an empty set raises, and
+> every member must be a name the profile maps or declares `unavailable`, so a
+> typo fails at import rather than at a revision's call site). Domains reach it
+> through two deliberately distinct accessors — `Domain._table_set` is required
+> because it decides *what gets written*, `Domain._optional_table_set` returns
+> `()` because it only sharpens what a journal entry *says*.
+>
+> One behavioural claim was removed rather than ported: `static_rev_limit`
+> hardcoded `applies = name.endswith("_dct")` and journaled "the variant this
+> car's ECU actually reads" on any bin. That is now the `static_rev_limit_active`
+> set — SC8S50 declares it, **A05 deliberately declares none**, and A05's journal
+> says all four variants were written and which one resolves is not established
+> for this car.
+>
+> Found and fixed on the way: `simoscal/tune/audit.py::table_byte_offsets`
+> computed a table's file extent from `view._cal.model.base_offset` — the XDF's
+> *declared* base — where the CalFile reads and writes through its effective
+> base. On SC8S50 the two agree, which is why nothing caught it; on a
+> CAL-relative definition like A05's the extent lands `0x220000` short of the
+> cells, so every A05 write sampled its before/after bytes from somewhere else.
+> No A05 write worked before this; the U7 tests are what exercised it.
+
 ---
 
 ### U8. Acceptance and regression consolidation
