@@ -1,0 +1,5 @@
+Build turns the current journal into a candidate bin. Enter the revision label you want in the output filename, then tap Build. The app writes to private staging, corrects the required checksums, reopens the file it actually wrote, and checks every journaled edit against that saved file.
+
+Read the changed-table list and every gate. Checksums must pass. Final-bin readback must match the journal. Recipe coherence and switch-patch sanity must hold where applicable. The raw-diff audit compares the candidate against the imported source and refuses unexplained bytes. A gate that did not run is displayed as did not run, never as a pass.
+
+Export or Share does not exist until the build is verified. Any later edit, undo, or redo invalidates that result and removes the export action until you build again. Sharing hands the verified bin to Android's share sheet, where you can save it or hand it to SimosTools. The app still does not flash. Read the standing warning: software verification proves file integrity and declared changes, not mechanical safety. The human review and flash decision remain yours.

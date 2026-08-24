@@ -1,0 +1,7 @@
+Five map slots compared side by side
+
+12 characterized on/off flags
+
+Each tap = one journal entry + undo point
+
+Four uncharacterized settings stay read-only

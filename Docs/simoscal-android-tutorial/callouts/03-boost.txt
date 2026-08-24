@@ -1,0 +1,7 @@
+Five slots on one graph
+
+Drag, type, or step through RPM points
+
+Solid line = effective base ceiling
+
+Overlay real boost + ECU setpoint

@@ -1,0 +1,3 @@
+Pedal feel shapes how accelerator position becomes torque request. Start by choosing the map you actually use: normal, sport, off-road, high, or low. Then choose an RPM column. The curve shows pedal position across the bottom and torque-request factor vertically.
+
+Drag a point for shaping or tap it for an exact value. The app constrains the curve to the supported factor range and will not silently accept an invalid number. Work through the RPM columns you intend to change, compare the draft with the source shape, and explain the reason in Why this change. Apply commits the complete staged map as one journaled edit. Discard removes the draft, while Revert to source deliberately stages the imported bin's original shape.

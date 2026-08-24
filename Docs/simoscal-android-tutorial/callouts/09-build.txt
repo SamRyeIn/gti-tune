@@ -1,0 +1,6 @@
+Checksums
+Final-file readback
+Recipe + switch-patch coherence
+Raw byte-diff audit
+
+Export appears only after every required gate passes

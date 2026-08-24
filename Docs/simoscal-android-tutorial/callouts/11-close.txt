@@ -1,0 +1,7 @@
+No network or vehicle permissions
+
+No flashing
+
+Verified files still require human review
+
+Logs start the next revision

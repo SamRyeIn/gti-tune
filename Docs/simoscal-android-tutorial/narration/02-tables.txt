@@ -1,0 +1,5 @@
+Tables is the complete catalog of calibration surfaces this profile allows the generic editor to reach. Search by parameter ID, plain-English description, or category. Every row tells you whether it is a scalar, axis, line, or grid, along with its units and dimensions. Tap a row to open it.
+
+The detail view labels both axes with the quantities they represent, shows the original and proposed values, and can display a heat map for larger grids. Tap cells to select them, or select all. You can type one value, Fill the selection, Offset it, Scale it, or Interpolate a continuous row or column. Axis edits must remain strictly increasing. Values outside the table's supported range are refused.
+
+Edits stay in a draft until Apply. One Apply becomes one engine operation, one journal entry, and one undo point. Discard drops only the local draft. Restore is different: it asks the engine to restore what the imported bin held and records that change in the journal. Tables with non-reversible scaling stay readable but cannot be edited. Domain-owned switch-patch tables are intentionally absent here; use their dedicated screens instead.

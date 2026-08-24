@@ -1,0 +1,5 @@
+Slots is the five-column switchboard for per-map features. Each row answers one comparative question across all five slots, such as switch-patch traction control, OEM traction control, launch control, no-lift shift, rolling anti-lag, pops, and the flex-fuel modifier enables.
+
+Writable flags are direct toggles. There is no draft or Apply button because a boolean has no intermediate shape to review: each tap is one engine call, one journal entry, and one undo point. The value changes only after the engine confirms it.
+
+Tap a row name for its description, units, and cautions. Four settings are intentionally read-only: RPM limiter, speed limiter, Manual AFU, and the gauge-settings bitmask. Their stored meanings are not characterized well enough for a safe write path. Showing them without enabling them is deliberate. Use the dedicated Limiters screen for characterized limiter controls, and use Changes immediately afterward to confirm exactly which slot flags moved.

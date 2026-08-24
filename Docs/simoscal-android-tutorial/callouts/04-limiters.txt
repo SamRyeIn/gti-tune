@@ -1,0 +1,7 @@
+Soft → Medium → Hard rev thresholds
+
+Road-speed limiter
+
+Standstill launch-control rev cap
+
+Review the complete staged set before Apply

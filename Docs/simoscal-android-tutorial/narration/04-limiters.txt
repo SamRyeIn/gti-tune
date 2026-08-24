@@ -1,0 +1,3 @@
+Limiters groups the places where the ECU must stop asking for more. The rev-limiter card shows soft, medium, and hard thresholds in escalation order. Dragging respects their ordering; exact typed values are refused if they cross a neighboring threshold. The road-speed limiter is edited in kilometers per hour. The standstill rev cap controls the launch-control RPM limit and displays its related timing values for context.
+
+Each Set action updates the local draft and the Why this change field documents intent. Review every limiter together, then Apply once. Discard returns the screen to the committed session values. These controls make limits reachable; they do not decide what is mechanically safe for a particular engine.

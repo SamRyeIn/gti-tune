@@ -1,0 +1,1 @@
+Tune on the tablet. Shape pedal response, boost, lambda, limiters, and map slots in physical units. Review every change. Build with checksums, final-file readback, and a byte audit. Then analyze real SimosTools logs on the device. simoscal turns calibration editing, verification, and evidence into one local workflow. You still make the final flash decision.

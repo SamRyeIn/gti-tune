@@ -1,0 +1,3 @@
+Changes is the live session journal. The tally summarizes edited bytes, operations, and swallowed or held-back entries. Needs your eyes lifts warnings and guarded actions above the full list. Every applied entry shows its target, intent, and before-to-after values.
+
+This screen is intentionally not a verification report. It has not run checksums, final-file readback, or the byte audit, so the amber banner says the session is still unverified. Undo and redo use the engine's history, and this screen rereads that journal each time you return. Review here first. Then move to Build for the actual gate.

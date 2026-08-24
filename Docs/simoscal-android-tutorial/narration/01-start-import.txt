@@ -1,0 +1,5 @@
+This tutorial uses the Android app from main at commit 18 e 189 e. The embedded simoscal engine is the matching local revision used by that build. The app edits calibration files; it does not connect to the vehicle and it never flashes an ECU.
+
+On the first screen, choose the calibration bin and its matching primary XDF definition. If the bin uses the Simos eighteen switch patch, choose the switch-patch XDF too. That third file is optional, but Boost and Slots remain unavailable without it. The app copies each selected file into private storage and records its hash. It never edits the file you selected in place.
+
+Tap Check this bin. Preflight checks file compatibility, the calibration layout, checksums, and profile support. A blocked result has no continue-anyway path: choose another bin or cancel. When preflight passes, open the session. If Android closes the app later, Resume session restores the imported files and the engine journal. Analyze datalogs is also available here and does not require an editing session.

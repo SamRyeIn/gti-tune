@@ -1,0 +1,7 @@
+One or several SimosTools CSVs
+
+Flashed bin + XDF add ceiling checks
+
+Findings, skipped checks, and evidence plots
+
+Compare every panel at the same RPM

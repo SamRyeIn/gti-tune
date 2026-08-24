@@ -9,6 +9,12 @@ References/
 # the scripts + REV_LOG.md are the record
 *_out/
 
+# Generated tutorial media — build_tutorial.zsh regenerates audio, frames and
+# scenes from narration/ and callouts/. Same rule as *_out/: the script and its
+# text inputs are the record. NOTE: the screen recordings it cuts frames from
+# live in /tmp and are not in the repo, so keep those if a rebuild matters.
+Docs/simoscal-android-tutorial/build/
+
 # ECU binaries (VW firmware-derived; regenerable from scripts + stock bin)
 *.bin
 

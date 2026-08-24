@@ -1,0 +1,7 @@
+Analyze runs the simoscal log-analysis battery on the tablet. Choose one or several SimosTools CSVs from the same session. Adding the bin that was actually flashed, plus its matching XDF, enables the two calibration-ceiling checks. Use the previous flashed bin here, not the new candidate you are still evaluating. Analysis never opens or changes an edit session.
+
+Tap Analyze. The summary reports how many logs, pulls, and checks were read, including the gear and RPM range for each pull. Findings are grouped by severity and carry the engine's evidence values. In this R14 example, the app flags boost tracking, fuel-pressure headroom, turbo heat, and other lower-severity observations.
+
+Read the skipped list with equal care. A check that could not run because a PID was absent is not a pass. Nothing flagged is not a clean bill of health when important checks were skipped.
+
+The plot guide is consistent across every panel. Solid colored lines are measured values, with one color per pull. Dashed gray lines are ECU targets or table references. Dash-dot gray lines are related measured signals. Faint dots are unsettled samples such as shift recovery and torque cuts. Horizontal amber and red lines are analysis watch levels, not ECU limits. Plots use loaded wide-open-throttle samples and break the line across lifts instead of inventing continuity. Compare panels at the same RPM to connect a cause with its symptom. Use these findings to decide what the next revision should investigate.

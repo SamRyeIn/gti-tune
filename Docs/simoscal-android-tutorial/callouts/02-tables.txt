@@ -1,0 +1,7 @@
+Search by ID, description, or category
+
+Select cells, then Fill / Offset / Scale / Interpolate
+
+Draft → review → one Apply
+
+Read-only and domain-owned tables stay protected

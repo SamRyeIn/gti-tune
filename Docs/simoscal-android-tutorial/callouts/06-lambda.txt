@@ -1,0 +1,7 @@
+Lambda versus RPM for each time row
+
+Lower lambda = richer
+
+Warning band highlights weak enrichment
+
+Typed unsafe values are refused

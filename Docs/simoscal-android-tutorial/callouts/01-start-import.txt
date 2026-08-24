@@ -1,0 +1,7 @@
+Choose the bin + matching XDF
+
+Switch-patch XDF unlocks Boost and Slots
+
+Preflight has no “continue anyway”
+
+Resume survives process death

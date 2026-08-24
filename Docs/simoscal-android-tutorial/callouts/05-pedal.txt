@@ -1,0 +1,7 @@
+Choose the drive-mode map
+
+Shape torque-request factor by RPM
+
+Drag for feel; type for precision
+
+Apply once with a written intent
