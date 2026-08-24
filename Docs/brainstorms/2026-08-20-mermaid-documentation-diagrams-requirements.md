@@ -8,9 +8,9 @@ Obsidian vault), `simoscal` (`Code/`, public, GPL-3.0), and `simoscal-android`
 
 ## Problem
 
-Across three repos and roughly 6,500 lines of hand-written Markdown there is
-exactly **one** mermaid diagram, and it sits in a brainstorm written three days
-before this one. That is not because the documentation has no structure worth
+Across three repos and roughly 6,500 lines of hand-written Markdown there are
+**two** mermaid diagrams: one in a brainstorm written three days before this
+one, and one unstyled six-node loop in `Code/docs/BETA_GUIDE.md` §7. That is not because the documentation has no structure worth
 drawing. It is because two documents got far enough to need a diagram and drew
 it in ASCII art instead:
 
@@ -85,7 +85,7 @@ correctness is verified by viewing that Artifact in both light and dark.
 
 ## Scope
 
-**In scope — 21 diagrams.** Priority is P1 (safety-critical or highest
+**In scope — 22 diagrams** (21 authored + 1 existing restyled). Priority is P1 (safety-critical or highest
 orientation value), P2 (clear win), P3 (marginal, ship last or drop).
 
 ### Cross-repo
@@ -96,16 +96,17 @@ orientation value), P2 (clear win), P3 (marginal, ship last or drop).
 
 ### gti-tune
 
-| ID  | Diagram               | Home                                  | Type                | Pri | Why                                                                                     |
-|-----|-----------------------|---------------------------------------|---------------------|-----|-----------------------------------------------------------------------------------------|
-| D2  | The tuning loop       | `CLAUDE.md`, `index.md`               | `flowchart` (cycle) | P1  | The six-step cycle, split by actor. A numbered list hides which steps are Sam's.        |
-| D3  | Folder data flow      | `CLAUDE.md`, `index.md`               | `flowchart`         | P1  | The layout table shows roles but cannot show flow between folders.                      |
-| D4  | Log analysis pipeline | `CLAUDE.md` §5, `Code/README.md`      | `flowchart`         | P2  | Draws the findings-only boundary: the tool never writes `log_review.md`.                |
-| D5  | Torque → boost chain  | `knowledge/ecu-tuning-basics.md:246`  | `flowchart`         | P1  | Replaces decaying ASCII. The core domain knowledge; renders in Obsidian.                |
-| D6  | Tune-order overlay    | `knowledge/ecu-tuning-basics.md`      | `flowchart`         | P2  | Same graph, numbered: airflow → boost → wastegate → timing/lambda.                      |
-| D7  | Revision lineage      | `Tunes/REV_LOG.md`                    | `gitGraph`          | P2  | 1,122 lines with no visual index. Shows the R15/R16 project split and what was flashed. |
-| D8  | P2563 causal chain    | `knowledge/eqt-s2-track-log-p2563.md` | `flowchart`         | P2  | Actuator pinned → boost under target → heat gap. Mermaid for reasoning, not structure.  |
-| D9  | Knowledge map         | `index.md`                            | `mindmap`           | P3  | Redundant with Obsidian's graph view; only earns its place in the GitHub view.          |
+| ID  | Diagram               | Home                                  | Type                | Pri | Why                                                                                         |
+|-----|-----------------------|---------------------------------------|---------------------|-----|---------------------------------------------------------------------------------------------|
+| D2  | The tuning loop       | `CLAUDE.md`, `index.md`               | `flowchart` (cycle) | P1  | The six-step cycle, split by actor. A numbered list hides which steps are Sam's.            |
+| D3  | Folder data flow      | `CLAUDE.md`, `index.md`               | `flowchart`         | P1  | The layout table shows roles but cannot show flow between folders.                          |
+| D4  | Log analysis pipeline | `CLAUDE.md` §5, `Code/README.md`      | `flowchart`         | P2  | Draws the findings-only boundary: the tool never writes `log_review.md`.                    |
+| D5  | Torque → boost chain  | `knowledge/ecu-tuning-basics.md:246`  | `flowchart`         | P1  | Replaces decaying ASCII. The core domain knowledge; renders in Obsidian.                    |
+| D6  | Tune-order overlay    | `knowledge/ecu-tuning-basics.md`      | `flowchart`         | P2  | Same graph, numbered: airflow → boost → wastegate → timing/lambda.                          |
+| D7  | Revision lineage      | `Tunes/REV_LOG.md`                    | `gitGraph`          | P2  | 1,122 lines with no visual index. Shows the R15/R16 project split and what was flashed.     |
+| D8  | P2563 causal chain    | `knowledge/eqt-s2-track-log-p2563.md` | `flowchart`         | P2  | Actuator pinned → boost under target → heat gap. Mermaid for reasoning, not structure.      |
+| D9  | Knowledge map         | `index.md`                            | `mindmap`           | P3  | Redundant with Obsidian's graph view; only earns its place in the GitHub view.              |
+| D22 | Beta-guide loop       | `Code/docs/BETA_GUIDE.md` §7          | `flowchart`         | P2  | Already exists, unstyled. Restyle to the vocabulary or the set stops reading as one system. |
 
 ### simoscal (`Code/`)
 

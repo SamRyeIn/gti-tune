@@ -7,7 +7,8 @@
 
 ## Summary
 
-Author 20 mermaid diagram blocks (21 catalog IDs; D6 merges into D5) across
+Author 20 mermaid diagram blocks and restyle 1 existing (22 catalog IDs;
+D6 merges into D5) across
 `gti-tune`, `simoscal`, and `simoscal-android`, replacing two decaying ASCII
 drawings and making three safety-critical conditionals visual. A shared visual
 vocabulary is defined first and proven on a two-diagram pilot before the
@@ -114,7 +115,7 @@ purpose.
 - Sam confirms the five roles read correctly before U2 begins
 - **This unit is a hard gate. No further diagram is drawn until it passes.**
 
-### U2. simoscal P1 diagrams (D10 insert, D11, D12, D14)
+### U2. simoscal P1 diagrams (D10 insert, D11, D12, D14, D22)
 
 **Repo:** simoscal (`Code/`) — PR from a branch off `main` per KTD7
 **Goal:** The public repo's safety and orientation diagrams.
@@ -126,6 +127,9 @@ purpose.
   (§Safety, line ~498); **replace** the ASCII fence at lines 68-89 with D12
 - modify `docs/BETA_GUIDE.md` — D11 spanning §3 (line ~85) → §5 → §6 (~192)
 - modify `docs/authoring-a-revision.md` — D10 cross-reference at §3 (~128)
+- modify `docs/BETA_GUIDE.md` §7 — **D22**, restyling the pre-existing unstyled
+  loop diagram to the vocabulary. Found during U2, not in the original survey:
+  a `grep -r` from the repo root did not descend into `Code/` as assumed.
 
 **Approach**
 D11 is the largest single readability win: a decision tree currently spread as

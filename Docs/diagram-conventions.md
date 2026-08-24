@@ -99,7 +99,7 @@ Appears verbatim in all three READMEs. Diff against this copy when auditing.
 flowchart TB
   subgraph GTI["gti-tune — this car's work, public"]
     direction LR
-    REV["TUNE_MainTune_R17.py<br/>one revision, one flat script"]:::auto
+    REV["your revision script<br/>one revision, one flat script"]:::auto
     REVIEW["log_review.md<br/>Claude's judgment"]:::auto
   end
 
@@ -114,8 +114,8 @@ flowchart TB
     SHELL["Compose shell + Chaquopy<br/>embeds the same library"]:::auto
   end
 
-  STOCK[("stock bin 5G0906259L__0002 + SC8S50 XDF")]:::data
-  PATCHED[("Patched_259L_R17.bin")]:::data
+  STOCK[("your stock bin + matching XDF")]:::data
+  PATCHED[("the patched bin")]:::data
   GATE{"human review gate<br/>Sam reads report.md + compare PNGs"}:::gate
   ST[["SimosTools app<br/>flashes and logs — never simoscal"]]:::external
   CAR(["Sam drives and logs a pull"]):::human
@@ -152,8 +152,10 @@ subgraph fill is a yellow that fights the palette above:
   style REPO_ID fill:#F5F5F5,stroke:#BDBDBD,stroke-width:1px,color:#212121
 ```
 
-The loop is the point: a revision produces a bin, Sam flashes and drives it,
-the logs come back, and the review feeds the next revision. The dashed edge is
+The loop is the point: a revision produces a bin, the human flashes and drives
+it, the logs come back, and the review feeds the next revision. Labels are kept
+generic on purpose — this block is duplicated verbatim into a public library
+README, where one car's filenames would read as canonical. The dashed edge is
 the only thing android adds — it runs the same library on a tablet.
 
 ## D10 — the `build()` gate sequence
