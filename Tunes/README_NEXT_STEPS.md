@@ -134,6 +134,87 @@ already flagged at −3.0° in the R07 logs. Cylinder 1 is the constraint on any
 timing increase, and IAT peaked at only 36 °C on a cool day — so the stock table's
 30 °C pull point was being crossed, which supports the premise here.
 
+## High-rpm ignition timing is the output bottleneck, not boost (R14 F=ma finding)
+
+A physics-based power derivation from the R14 slot-4 WOT logs
+(`Logs/BasicsGuide_R14/derive_hp_tq_fma.py`, F = m·a + drag + rolling on the
+undriven-wheel speeds, outputs in `plots/fma_hp_tq/`) puts the car at
+**244–254 whp / ~270–280 crank hp, ~410 Nm crank torque**, consistent across
+four 3rd-gear pulls. The trimmed ECU `Calc HP` cross-check tracks the same
+shape ~8–10 % higher (its own assumed mass), and published IS20 comparisons
+bracket it: Stage 1 on 91/93 ≈ 250–268 whp, Stage 2 vendor claims ~300–316 whp.
+
+The mismatch that makes this a queue item: **airflow is Stage-2-level while
+output is Stage-1-level.** Above 5800 rpm the three clean pulls hold
+~1230 mg/stk / ~20 psi, yet deliver `Ign Avg` ≈ 1–2 °CRK with **zero** knock
+retard (`Knock Avg` 0.0 on all three; only the known cylinder-1 −3 ° event all
+session). Lambda ≈ 0.80 up top is *on target* — 0.80 at full load is this
+build's deliberate, log-validated setpoint (see [[ecu-tuning-basics]] and the
+R03 `tune.fueling.lambda_floors(0.80)` decision), and normal for a boosted DI
+engine — so fueling is not the lever. Conservative high-rpm timing on 92
+octane is where the missing ~40–60 whp lives; at this airmass a few degrees is
+typically worth 15–25 whp.
+
+**Reference-log confirmation (2026-08-20).** The same derivation run on the
+Cobb Accessport logs in `References/` (`derive_hp_tq_fma_cobb.py`, outputs in
+`References/fma_out/`) — **this same car** in its EQT Stage 2 era (tune
+calibrated for 91 octane, run on 92 octane, the same fuel as R14) — measures
+**288 whp** on the clean 2022 3rd-gear street pull (track pulls cluster
+283–314 whp, grade-contaminated). Above 5800 rpm the EQT cal ran
+`Ignition Timing Final` **5.3–7.2 °** with zero knock retard at lambda ≈ 0.787
+and 28.4 psi peak boost — same car, same fuel, same boost, same fueling as
+R14, ~4–6 ° more timing, ~40–60 whp more output. Sam confirms the same
+downpipe was fitted for all logs (EQT era and R14 alike), so exhaust hardware
+is eliminated as a variable and the gap is calibration-only.
+
+**But do not read EQT's zero knock retard as proof the engine was knock-free
+at 5–7 °** — Sam believes EQT's calibration included knock *sensor* tuning
+(desensitised detection thresholds, standard practice in aggressive cals to
+suppress false knock). Under altered detection, "no retard" only proves the
+ECU didn't flag knock by EQT's own thresholds. So EQT's timing is evidence of
+what a professional cal *ran* on this exact car and fuel — a target worth
+walking toward — not a validated knock-free floor. Our lineage has never
+touched the knock detection tables (stock in R00–R15), which cuts both ways:
+R14's zero retard at 1–2 ° is a trustworthy measurement, and any knock that
+appears as we add timing will be heard at stock sensitivity. That is the
+safety net the ≤1.5 °-per-revision steps below rely on — keep detection
+stock while raising timing. Remaining caveat: Accessport
+`Ignition Timing Final` vs SimosTools `Ign Avg` are close but not
+guaranteed-identical channel definitions.
+
+Sequencing and scope:
+
+- **The Spark IAT correction item above goes first** — `IP_IGA_BAS_TEMP_N_32`
+  — Spark IAT correction is already queued, evidence-backed, and recovers
+  timing the stock table is pulling above 30 °C. Re-run this F=ma derivation
+  on the post-flash logs: it is a direct, repeatable output measurement, so it
+  quantifies in whp what the IAT table change actually bought.
+- If output is still short after that, the follow-on lever is the base
+  ignition maps' high-rpm/high-airmass region (exact table IDs to be resolved
+  from the XDF when scripted — the base spark grids, not the IAT correction).
+  Small steps (≤ 1.5 ° per revision), one change per revision, cylinder 1 is
+  the known constraint (−3.0 ° latching at 5545 rpm on the hottest R14 pull,
+  same cylinder flagged at R07).
+- Watch items on every timing revision's logs: `Knock Cyl 1-4` retard depth
+  and latch behavior, `Ign Avg` delivered vs commanded, and the F=ma whp
+  delta. Zero knock retard after a timing increase means headroom remains;
+  recurring cylinder-1 retard means stop.
+
+**Mid-rpm ~26 psi is the thin-margin knock cell — applies to boost items too.**
+The 2025 Pacific track log (`References/20250816_Pacific_Track_Log6.csv`, EQT
+cal, 92 octane, 415 s of sustained load) shows this engine's only knock of the
+session as two isolated single-step events at **~4300–4600 rpm / ~26 psi**
+(cyl 1 −1.88 ° for 1.5 s in 5th, cyl 4 −1.88 ° for 0.7 s in 4th, IAT 88 °F,
+both self-recovering; zero retard above 5800 rpm all session). So the knock
+boundary on this engine is nearest in the peak-cylinder-pressure cell, not up
+top where the timing headroom lives. Two implications: (1) the R15 wastegate
+walk-back and any future boost increase land load in exactly this rpm band —
+review its `Knock Cyl 1-4` there specifically, under heat soak if possible
+(Pacific IATs reached 133 °F later in that session; street pulls don't
+reproduce that); (2) cylinder 1 knocked first under *both* calibrations
+(R07, R14, and the EQT track log), so it is a physical trait of this engine
+and stays the constraint cylinder regardless of which table moves.
+
 Conventions: name every table as `` `ID` — Description `` (both, always). Switch-patch
 tables are patch-added and have **no A2L IDs** — reference them by title. See
 [[sc8s50-switchpatch-xdf]] for the switch-patch structure and per-slot table set.
