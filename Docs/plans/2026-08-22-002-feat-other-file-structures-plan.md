@@ -490,6 +490,63 @@ shape-variant warning quoted verbatim from the origin doc.
 
 **Verification** — AE1–AE8 all pass; no SC8S50 test body was edited across U2–U8.
 
+> [!note] Amended 2026-08-24, after U8 landed
+> Most of U8 had already landed inside U5–U7; the audit found one real gap, not
+> the five the unit anticipated.
+>
+> **AE numbering is per-effort in this repo**, not global. `test_acceptance.py`,
+> `_plot`, `_export`, `_sop`, `_btp` and `_analysis` each scope their own AE1–AEn
+> in their module docstring. So this plan's list got its own file,
+> `tests/test_acceptance_foreign.py`, rather than a renumbering — `test_ae4_*`
+> there means this plan's AE4 and nothing else. The README now says this out
+> loud, because grepping `ae8` across the suite finds the wrong test.
+>
+> Where each AE was already proven: AE1 `test_f6_ae1_…`, AE2
+> `test_f2_a05_is_ready_and_writable_…`, AE3
+> `test_f6_both_a05_checksums_verify_…`, AE5 `test_f6_the_nine_ignition_grids_…`
+> + `test_f6_declaring_the_wrong_shape_…`, AE7
+> `test_f5_correct_refuses_rather_than_silently_changing_nothing`, AE8
+> `test_no_registered_profile_at_all_is_inspect_only`. The acceptance file states
+> each claim's headline and names the detailed test, so the list is enumerable in
+> one place without the detail being stated twice and drifting.
+>
+> **The one real gap was AE4.** `test_f6_an_a05_edit_lands_in_the_table_and_nowhere_else`
+> proves the bytes land correctly, but through `CalFile.save` — it never touched
+> the gate chain a real build runs. `test_ae4_an_a05_edit_passes_every_build_gate`
+> now puts A05 through `run_gates`: save with checksums corrected, verify them
+> independently off the written file, read every journaled table back off the
+> saved bin, and byte-audit against the stock bin with an allowance derived from
+> the journal. All gates vote clean. It is paired with
+> `test_ae4_an_undeclared_change_still_fails_the_audit`, which declares a
+> reference carrying one extra unaccounted byte and requires it to surface as
+> `unexplained` *and* as a build problem — without that, AE4's pass would only
+> prove the audit is quiet.
+>
+> Worth noting: none of this could have passed before U7's `audit.py`
+> base-offset fix, which is what made any A05 write work at all.
+>
+> **F4's patch reassignment** was already done in U6 — F4b now pins "S50's map
+> against A05's file must still miss every name", with the reassignment explained
+> in its own docstring.
+>
+> AE6 is pinned two ways: `test_ae6_the_structural_claims_were_rewritten_not_deleted`
+> lists the twelve F1–F5 structural assertions by name so deleting one to make a
+> suite green fails, and `test_ae6_the_foreign_suite_still_fails_loudly_when_its_fixtures_vanish`
+> checks that `SIMOSCAL_REQUIRE_FOREIGN=1` still converts an absent fixture into
+> a failure rather than a skip.
+>
+> **Suite total: 966 passed, 4 warnings, ~137s** (was 951 before U7; +4 from U7's
+> F9 tests, +11 from U8's acceptance file). No SC8S50 test body was edited across
+> U2–U8; the only test edit was `test_preflight.py`'s `Decoy` fixture in U7, which
+> constructed an internally inconsistent profile that the new validation
+> correctly refuses.
+>
+> Docs: `porting-to-another-xdf.md` gained `Profile.table_sets` as the sixth
+> per-car fact, the required-vs-optional accessor rule, and the
+> structural-guards-are-universal boundary; `README.md` gained a "More than one
+> car" section stating plainly that SCGA05 is bench-verified only and that
+> nothing in the library distinguishes that from validated.
+
 ## Scope boundaries
 
 **Out:** any validated-tune claim for A05; calibration guidance for A05; flashing; a
