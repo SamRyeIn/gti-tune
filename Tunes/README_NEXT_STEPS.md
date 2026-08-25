@@ -10,26 +10,23 @@ This file now lives at the `Tunes/` root and spans both project folders: it
 tracked `TuningBasicsGuide` (R00–R15) alone until R15, and continues into
 `MainTune` (R16 onward) — see `REV_LOG.md` for the project split.
 
-Current lineage tip: **R15 — built and verified, awaiting Sam's review + flash**
-(see `REV_LOG.md`). R14 is flashed, logged and reviewed.
+Current lineage tip: **R16 — replacement build verified, awaiting Sam's human
+review and CAL flash** (see `REV_LOG.md`). R15 is flashed, logged, and reviewed in
+`Logs/BasicsGuide_R15/log_review.md`.
 
-**`Tunes/MainTune/` now exists** for R16 onward, with output bins renamed to
+**`Tunes/MainTune/` is active** for R16 onward, with output bins renamed to
 `Patched_259L_R<NN>.bin` (dropping the `CB_HSL_SP2933_..._BasicsGuide_` prefix
-`TuningBasicsGuide` used). R16 is not written yet — it's blocked on flashing
-and logging R15 first, since R16 will need R15's validation logs the same way
-R15 needed R14's. When it's time: copy `TUNE_Basics_Guide_R15.py` into
-`Tunes/MainTune/TUNE_MainTune_R16.py`, update `OUT_ROOT`, `OUT_BIN_NAME`, and
-the R15 reference-bin path, then edit the domain calls per R15's log findings.
-Guide: `Code/docs/authoring-a-revision.md`.
+used through R15). R16 is the first built MainTune revision. Its verified
+candidate is `MainTune_out/R16_20260825-140451/Patched_259L_R16.bin`; the script
+is `TUNE_MainTune_R16.py`.
 
 **R14 was the first real calibration change in the `simoscal.tune` API** — a stock
 map on slot 1 and the drivable slots ordered least→most aggressive (1 stock
 ~21.6 psi, 2 conservative, 3 intermediate, 4 aggressive), slot 5 valet unchanged.
 Only the four per-slot `PUT setpoint` grids moved; the shared base is
 byte-identical to R13/R12. Flashed and validated in-car on 2026-08-10 —
-`Logs/BasicsGuide_R14/log_review.md` is the evidence base for everything queued
-below. To write R16, copy `TUNE_Basics_Guide_R15.py`, edit the domain calls, run
-it. Guide: `Code/docs/authoring-a-revision.md`.
+`Logs/BasicsGuide_R14/log_review.md` remains the evidence base for the open slot
+and upshift items below.
 
 ## Still open — validate the four slots R14 moved but nobody drove
 
@@ -53,7 +50,7 @@ five stored curves and names the best match. Keep it to its **own session** —
 validating the slot ladder and R15's feedforward edit in one log makes both
 harder to read, whichever order they happen in.
 
-## R15 — built, awaiting review + flash
+## R15 — flashed, logged, and reviewed
 
 Moved out of this queue: R15 walks back R08's wastegate deepening in the five
 `IP_FAC_BPA_SP[0]` / `[1]` — Wastegate Position Feedforward cells the R14 logs
@@ -66,11 +63,11 @@ Full rationale, sizing method, predicted per-band effect and verification:
 `TUNE_Basics_Guide_out/R15_20260810-212341/` — 24 changed bytes vs R14, 0
 unexplained, exactly 2 tables differ.
 
-**Primary watch item on the validation logs is fuel, not boost.** HPFP effective
-volume already runs 96-98 % through the shelf zone and this edit adds boost
-there. If the next logs show the shortfall persisting with fuel still in hand,
-R16 can go past the R07 values with evidence — that bound is a first-pass
-safety choice, not a physical limit.
+The 2026-08-25 slot-4 logs cleared R15's validation gate. Boost tracking improved
+through 3500–5000 rpm, the redline wastegate integral fell from +17.8 % to
++12.5 %, and neither DI rail pressure nor lambda control regressed. Two isolated
+−3.0° knock events occurred at 4596 and 4751 rpm, so the midrange remains out of
+scope for timing increases. Full evidence: `Logs/BasicsGuide_R15/log_review.md`.
 
 ## Blocked on data — the WOT upshift overboost
 
@@ -98,122 +95,44 @@ What would unblock it:
   loop is also blind above it, and a 26 psi target that transiently rails it is a
   design constraint, not just a logging nuisance.
 
-## Apply the author's Spark IAT correction table (currently stock — power left on the table)
+## R16 — built; next action is human review, flash, and logging
 
-`IP_IGA_BAS_TEMP_N_32` — Spark IAT correction (RPM × IAT → °CRK offset) has never
-been touched in any revision (R00–R14) and is still bit-for-bit stock. R11's log
-review found delivered timing pulled back over loaded WOT with **zero** knock and
-**zero** torque-limiter activity (`Torque Lim` = 0 on every row, all four files —
-see `Logs/BasicsGuide_R11/log_review.md`), consistent with the stock IAT table
-pulling timing above 30°C/86°F per its calibrated shape, not a protection event.
-With the upgraded intercooler this car likely isn't reaching charge temps that
-justify stock's pull point.
+R16 moved out of the idea queue after the verified
+`MainTune_out/R16_20260825-140451/` replacement build. Its authoritative rationale, exact
+targets, hashes, changed-byte scope, and automated gate results are in
+`REV_LOG.md` § R16. Review `report.md`,
+the Spark-IAT review assets, and all nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0
+port-flap-low cam-position heatmaps before any human-performed CAL flash.
 
-The tuning basics guide already has an author's alternative transcribed and
-double-entry verified (`knowledge/ecu-tuning-basics.md:462-466`,
-`media/ecu-tuning-basics/38-iat-correction.png`): no added timing when cold
-(winter-blend fuel knocks more), no pull until 40°C/104°F instead of stock's
-30°C, plus a re-breakpointed Y axis (35.25 added, 70.5 dropped vs stock).
+Validation protocol on slot 4 and 92-octane fuel:
 
-- Transcribe the author's table values into the next revision script as named
-  constants (re-verify the double-entry transcription against the screenshot
-  before writing).
-- Write the table via the `simoscal.tune` API with an `intent=` describing the
-  IC-justified rationale above.
-- Re-run the R11-style loaded-WOT timing/knock analysis after the next flash +
-  log to confirm the new table isn't exposing knock that the stock pull-back was
-  masking — this is a timing *increase*, so treat the first pulls conservatively
-  and watch knock retard closely.
+1. Capture one controlled actual-3rd-gear pull to redline without stacking
+   back-to-back attempts. The EQT-matched table curve begins at 5000 rpm and
+   includes the known cylinder-1 susceptibility around 5500 rpm.
+2. If the first pull is clean, capture one separate controlled pull in the
+   30–40.5 °C IAT region without deliberately creating unsafe heat soak. The
+   Spark-IAT and EQT-table changes overlap and must be reviewed together.
+3. Run `python -m simoscal.analysis Logs/MainTune_R16` and author
+   `Logs/MainTune_R16/log_review.md`. Compare 5000+ rpm `Ign Table`, `Ign Avg`,
+   `Knock Cyl 1-4`, IAT, lambda, DI rail hold, HPFP effective volume, boost
+   tracking, turbo speed, and the physics-derived power curve against R14/R15.
 
-**Do not stack this with the R15 wastegate edit.** One change per revision is what
-makes the logs readable — a timing increase and a boost increase in the same flash
-cannot be attributed if knock appears. The R14 logs also give this item a specific
-watch target: cylinder 1 was the **only** cylinder to retard all session (−3.0°
-latching at 5545 rpm and decaying to redline, on the hottest pull), and it was
-already flagged at −3.0° in the R07 logs. Cylinder 1 is the constraint on any
-timing increase, and IAT peaked at only 36 °C on a cool day — so the stock table's
-30 °C pull point was being crossed, which supports the premise here.
+Expected table output follows 1.875° at 5000, 3.750° at 5500, 6.000° at 6000,
+and 8.250° at 6500 rpm across 1050–1400 mg/stk; delivered timing remains subject
+to IAT and other corrections. Recurring retard in the changed band, any fresh
+multi-cylinder event, a deeper or longer cylinder-1 event, loss of
+fuel-pressure/lambda control, or protection that prevents delivery is a
+stop/rollback signal.
 
-## High-rpm ignition timing is the output bottleneck, not boost (R14 F=ma finding)
+## R17 — blocked on R16 validation
 
-A physics-based power derivation from the R14 slot-4 WOT logs
-(`Logs/BasicsGuide_R14/derive_hp_tq_fma.py`, F = m·a + drag + rolling on the
-undriven-wheel speeds, outputs in `plots/fma_hp_tq/`) puts the car at
-**244–254 whp / ~270–280 crank hp, ~410 Nm crank torque**, consistent across
-four 3rd-gear pulls. The trimmed ECU `Calc HP` cross-check tracks the same
-shape ~8–10 % higher (its own assumed mass), and published IS20 comparisons
-bracket it: Stage 1 on 91/93 ≈ 250–268 whp, Stage 2 vendor claims ~300–316 whp.
-
-The mismatch that makes this a queue item: **airflow is Stage-2-level while
-output is Stage-1-level.** Above 5800 rpm the three clean pulls hold
-~1230 mg/stk / ~20 psi, yet deliver `Ign Avg` ≈ 1–2 °CRK with **zero** knock
-retard (`Knock Avg` 0.0 on all three; only the known cylinder-1 −3 ° event all
-session). Lambda ≈ 0.80 up top is *on target* — 0.80 at full load is this
-build's deliberate, log-validated setpoint (see [[ecu-tuning-basics]] and the
-R03 `tune.fueling.lambda_floors(0.80)` decision), and normal for a boosted DI
-engine — so fueling is not the lever. Conservative high-rpm timing on 92
-octane is where the missing ~40–60 whp lives; at this airmass a few degrees is
-typically worth 15–25 whp.
-
-**Reference-log confirmation (2026-08-20).** The same derivation run on the
-Cobb Accessport logs in `References/` (`derive_hp_tq_fma_cobb.py`, outputs in
-`References/fma_out/`) — **this same car** in its EQT Stage 2 era (tune
-calibrated for 91 octane, run on 92 octane, the same fuel as R14) — measures
-**288 whp** on the clean 2022 3rd-gear street pull (track pulls cluster
-283–314 whp, grade-contaminated). Above 5800 rpm the EQT cal ran
-`Ignition Timing Final` **5.3–7.2 °** with zero knock retard at lambda ≈ 0.787
-and 28.4 psi peak boost — same car, same fuel, same boost, same fueling as
-R14, ~4–6 ° more timing, ~40–60 whp more output. Sam confirms the same
-downpipe was fitted for all logs (EQT era and R14 alike), so exhaust hardware
-is eliminated as a variable and the gap is calibration-only.
-
-**But do not read EQT's zero knock retard as proof the engine was knock-free
-at 5–7 °** — Sam believes EQT's calibration included knock *sensor* tuning
-(desensitised detection thresholds, standard practice in aggressive cals to
-suppress false knock). Under altered detection, "no retard" only proves the
-ECU didn't flag knock by EQT's own thresholds. So EQT's timing is evidence of
-what a professional cal *ran* on this exact car and fuel — a target worth
-walking toward — not a validated knock-free floor. Our lineage has never
-touched the knock detection tables (stock in R00–R15), which cuts both ways:
-R14's zero retard at 1–2 ° is a trustworthy measurement, and any knock that
-appears as we add timing will be heard at stock sensitivity. That is the
-safety net the ≤1.5 °-per-revision steps below rely on — keep detection
-stock while raising timing. Remaining caveat: Accessport
-`Ignition Timing Final` vs SimosTools `Ign Avg` are close but not
-guaranteed-identical channel definitions.
-
-Sequencing and scope:
-
-- **The Spark IAT correction item above goes first** — `IP_IGA_BAS_TEMP_N_32`
-  — Spark IAT correction is already queued, evidence-backed, and recovers
-  timing the stock table is pulling above 30 °C. Re-run this F=ma derivation
-  on the post-flash logs: it is a direct, repeatable output measurement, so it
-  quantifies in whp what the IAT table change actually bought.
-- If output is still short after that, the follow-on lever is the base
-  ignition maps' high-rpm/high-airmass region (exact table IDs to be resolved
-  from the XDF when scripted — the base spark grids, not the IAT correction).
-  Small steps (≤ 1.5 ° per revision), one change per revision, cylinder 1 is
-  the known constraint (−3.0 ° latching at 5545 rpm on the hottest R14 pull,
-  same cylinder flagged at R07).
-- Watch items on every timing revision's logs: `Knock Cyl 1-4` retard depth
-  and latch behavior, `Ign Avg` delivered vs commanded, and the F=ma whp
-  delta. Zero knock retard after a timing increase means headroom remains;
-  recurring cylinder-1 retard means stop.
-
-**Mid-rpm ~26 psi is the thin-margin knock cell — applies to boost items too.**
-The 2025 Pacific track log (`References/20250816_Pacific_Track_Log6.csv`, EQT
-cal, 92 octane, 415 s of sustained load) shows this engine's only knock of the
-session as two isolated single-step events at **~4300–4600 rpm / ~26 psi**
-(cyl 1 −1.88 ° for 1.5 s in 5th, cyl 4 −1.88 ° for 0.7 s in 4th, IAT 88 °F,
-both self-recovering; zero retard above 5800 rpm all session). So the knock
-boundary on this engine is nearest in the peak-cylinder-pressure cell, not up
-top where the timing headroom lives. Two implications: (1) the R15 wastegate
-walk-back and any future boost increase land load in exactly this rpm band —
-review its `Knock Cyl 1-4` there specifically, under heat soak if possible
-(Pacific IATs reached 133 °F later in that session; street pulls don't
-reproduce that); (2) cylinder 1 knocked first under *both* calibrations
-(R07, R14, and the EQT track log), so it is a physical trait of this engine
-and stays the constraint cylinder regardless of which table moves.
+Do not add more timing, change knock detection, or combine a timing increase
+with a boost/wastegate change until the R16 logs are reviewed. R16 now copies
+the EQT log's table-output curve rather than its final timing and retains stock
+knock detection. The known 4300–4750 rpm / high-airmass knock region remains
+excluded, while the 5000–6500 rpm region requires explicit validation because
+the replacement R16 supersedes prior R04 protection there.
 
 Conventions: name every table as `` `ID` — Description `` (both, always). Switch-patch
 tables are patch-added and have **no A2L IDs** — reference them by title. See

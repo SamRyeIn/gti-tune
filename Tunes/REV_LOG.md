@@ -45,6 +45,7 @@ the final review remain human-only steps.
 | R13      | `TUNE_Basics_Guide_R13.py` | No calibration change. Re-declares the complete R00–R12 calibration in the `simoscal.tune` API as one flat script (zero imports from other revisions); output bin byte-identical to R12. Do not flash.                                                                                                                                                    |
 | R14      | `TUNE_Basics_Guide_R14.py` | R13 calibration + add a stock map (slot 1, factory `IP_PUT_SP` boost target ~21.6 psi read live from the stock bin) and reorder the drivable slots least→most (1 stock, 2 conservative, 3 intermediate, 4 aggressive); slot 5 valet unchanged. Only the four per-slot `PUT setpoint` grids move. CAL-flash eligible after the R07 patch set is installed. |
 | R15      | `TUNE_Basics_Guide_R15.py` | R14 calibration + walk back R08's wastegate deepening in the five `IP_FAC_BPA_SP[0]`/`[1]` cells the R14 logs show under-delivering, every value bounded at its R07 level. Only the two wastegate feedforward maps move. CAL-flash eligible after the R07 patch set is installed.                                                                         |
+| R16      | `TUNE_MainTune_R16.py`     | First MainTune revision. R15 calibration + exact guide-author Spark IAT axis/grid, a curve-preserving shared-axis migration of the Reference IGA correction, and the EQT Stage 2 log's 5000-rpm-up `Ignition Table Output` curve across 1050/1200/1400 mg/stk in all nine VVL-0 port-flap-low base-timing maps. CAL-flash eligible after the R07 patch set is installed. |
 
 ## R00 — Initial revision
 
@@ -1120,3 +1121,116 @@ slots in a separate session rather than the same one.
 Still **revision 15 — a starting point, not a finished calibration**. The script
 never flashes; Sam reviews `report.md` and the two wastegate PNGs before it
 reaches the car.
+
+## R16 — exact Spark IAT correction and EQT-matched high-RPM timing
+
+**⚠ CAL flash eligible after R07 patch installation.** R16 retains R07's
+CBRICK, HSL, and switch-patch 29.33 ASW/code components byte-identically and
+moves calibration bytes only. Flashing and the final review gate remain human
+steps.
+
+R16 is the first revision under `Tunes/MainTune/`. It opens the untouched stock
+recovery image, reapplies the complete R15 patch and calibration declaration,
+then adds the Spark-IAT and base-timing changes recorded in
+`Docs/plans/2026-08-25-001-r16-spark-iat-high-rpm-timing-plan.md`.
+
+### R15 prerequisite
+
+`Logs/BasicsGuide_R15/log_review.md` closes the predecessor gate. The R15
+wastegate walk-back improved 3500–5000 rpm boost tracking, reduced redline
+integral load, and did not regress rail pressure or lambda control. Its two
+isolated −3.0° knock events were at 4596 and 4751 rpm, outside R16's timing
+cells. No recurring retard appeared at 6000–6500 rpm.
+
+### Exact Spark IAT family
+
+R16 writes the tuning-guide author's complete table to
+`IP_IGA_BAS_TEMP_N_32` — Basis for temperature correction of Basic IGA versus
+N_32, TIA. The shared `ldpm_tia_iga_cor_sel` — Basis for temperature correction
+of IGA versus N_32, TIA intake-air-temperature axis changes from
+−30/−20.25/−9.75/0/30/40.5/50.25/60/70.5/80.25 °C to
+−30/−20.25/−9.75/0/30/**35.25**/40.5/50.25/60/80.25 °C.
+
+Because that axis is shared, R16 resamples
+`IP_IGA_REF_TEMP_N_32` — Basis for temperature correction of Reference IGA
+versus N_32, TIA onto the new breakpoints before moving the axis. A dense
+continuous-IAT comparison after final-bin encoding gives **0.187158°CRK maximum
+deviation**, below the one-step 0.375°CRK limit.
+
+### EQT-matched base timing from 5000 rpm
+
+At Sam's explicit direction, the final R16 supersedes the first unflashed
+bounded-timing draft. It matches `Ignition Table Output` from the same-car EQT
+Stage 2 91 log `References/20220522_EQTS2_3Gear1.csv`; it does not target the
+correction-dependent `Ignition Timing Final` channel. The source segment has 132
+third-gear WOT samples from 5024–6336 rpm, with zero knock retard on all four
+cylinders and zero COBB spark reduction.
+
+A least-squares piecewise-linear fit on the ECU's 5000/5500/6000/6500 rpm
+breakpoints, quantized to the table's 0.375°CRK resolution, gives the following
+curve. The same targets are written at 1050, 1200, and 1400 mg/stk in every map
+of the nine-member `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition
+angle, VVL 0 port-flap-low cam-position family so the EQT match is not diluted
+as logged airmass tapers toward redline.
+
+| Engine speed | R15 at 1050 / 1200 / 1400 mg/stk | R16 at all three loads | Largest increase |
+|--------------|----------------------------------|------------------------|------------------|
+| 5000 rpm     | 1.125 / −2.250 / −2.250°         | 1.875°                 | +4.125°CRK       |
+| 5500 rpm     | 0.750 / −0.750 / 0.000°          | 3.750°                 | +4.500°CRK       |
+| 6000 rpm     | 1.875 / 1.875 / 1.875°           | 6.000°                 | +4.125°CRK       |
+| 6500 rpm     | 3.375 / 3.375 / 3.375°           | 8.250°                 | +4.875°CRK       |
+
+Across all 132 source samples, the encoded curve matches EQT table output with
+**0.188898° RMS error**, **0.435° maximum absolute error**, and **+0.059° mean
+bias**. This deliberately supersedes R04 cells from 5000 rpm upward, including
+the 5500-rpm and 1050-mg/stk cells retained by the first draft. It does not
+change timing below 5000 rpm or at/below 900 mg/stk, and stock knock detection
+remains untouched. The R14 cylinder-1 event beginning at 5545 rpm and R15's
+4596/4751-rpm events are explicit human-review risks, not hidden assumptions.
+
+### Verification (replacement run `R16_20260825-140451`)
+
+- Output: `Tunes/MainTune/MainTune_out/R16_20260825-140451/Patched_259L_R16.bin`.
+  SHA-256:
+  `061d878dee5d5229e9273b5e9ca7c5ad5e4706475639623f73c253bc0c2021bd`.
+- R15 byte-audit reference SHA-256:
+  `02f09df6fbe4ef057f47a05a5b52656ca8bdbbfdd587c9e24f0de25d7073207a`.
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`); final-bin readback **PASS** for all
+  139 touched tables; switch-patch sanity **PASS** — 123/123 tables resolved
+  and decoded, 52 differ from stock.
+- Raw-diff audit vs R15 **CLEAN** — 177 changed bytes, all attributed:
+  173 journaled calibration bytes plus 4 stored-checksum bytes; unexplained = 0.
+- Independent XDF decode found exactly **12 changed calibration tables**: the
+  shared IAT axis, the Basic and Reference IGA temperature-correction grids,
+  and the nine base-ignition maps. Every other decoded calibration table is
+  identical to R15.
+- All nine base-ignition maps contain exactly the twelve targets above, are
+  mutually identical, and differ from R15 in exactly those twelve cells each.
+  No timing cell below 5000 rpm or at/below 900 mg/stk changed.
+- Independent decode repeated the EQT fit against the final-bin targets and
+  reproduced 0.188898° RMS / 0.435° maximum error over all 132 source samples.
+- Focused library tests: **80 passed**. Review all nine
+  `compare/IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]__compare_heatmap.png` files.
+  The IAT family is unchanged from the superseded draft; the standard axis and
+  table artifacts remain in `compare/`, while the continuous-curve review is in
+  the earlier unflashed draft folder as `compare/R16_IAT_family_review.png`.
+
+### Human review and logging gate
+
+Review `report.md`, the IAT-family plot, and all nine timing heatmaps before any
+CAL flash. For the first validation session use slot 4 and 92-octane fuel.
+Capture one controlled actual-3rd-gear pull to redline rather than stacking
+back-to-back pulls; the EQT-matched cells begin at 5000 rpm and include the
+known 5500-rpm cylinder-1 susceptibility.
+
+After the human-performed flash, run the standard analysis battery and author
+`Logs/MainTune_R16/log_review.md`. Compare 5000+ rpm table and delivered timing,
+all four knock channels, IAT, lambda, DI rail pressure, HPFP effective volume,
+boost tracking, turbo speed, and physics-derived power against R14/R15. Recurring
+retard in the changed band, any fresh multi-cylinder event, a deeper or longer
+cylinder-1 event, loss of fuel or lambda control, or a protection that prevents
+the requested timing from being delivered is a rollback signal. No further
+timing increase is authorized until those logs are reviewed.
+
+Still **revision 16 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.
