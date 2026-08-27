@@ -690,6 +690,58 @@ public and the decision to put calibration values in its test data is Sam's.
 Back-test artifacts are gitignored in this repo for the same reason — a bundle
 is the whole decoded calibration in the clear, and this remote is public.
 
+**Follow-up result (2026-08-27, same day)** — All three defects above are fixed,
+plus a fourth found while fixing them. Ranked actions 1-3 of
+`Docs/backtest/README.md` are done; action 4 (re-running the four `answer` calls)
+is not, because it costs ~$3.5 and 7-day rate limit and is Sam's call.
+
+- **Defect 3, first** — `simoscal.analysis` gained a tenth check family,
+  `boost_shortfall`, sitting beside the overshoot check on the same two channels.
+  A shortfall zone is any run of *post-spool* samples where PUT sits below
+  setpoint, qualified on mean depth **or** area (mean x duration), never on a
+  per-sample threshold — a real shortfall wanders, and a per-sample entry line
+  chopped R14's four-second ridge into fragments that each looked like noise.
+  Post-spool is defined as settled samples at or after the first one where PUT
+  reached setpoint, which needs no wastegate channel; a pull that never reached
+  setpoint is labelled as such rather than skipped. Never a High: a shortfall
+  costs power, not pistons.
+
+  What makes it *actionable* rather than merely descriptive is that each zone
+  carries what the wastegate was doing across it — the integral's wind-up, how
+  far the final command ran above the position feedforward, and how much of the
+  zone the gate spent commanded shut — so the finding distinguishes "the
+  feedforward is asking too little and the loop is covering for it" (raise the
+  feedforward, which is what R15 did) from "the gate is already shut, no
+  controller table will help". Run over the whole log lineage it fires Medium on
+  R09/R11/R14/R15/R17 with the feedforward branch every time, and Low on R01
+  (spool-edge only) and R04 (the overshoot log — 1.2 kPa mean). The R15 edit is
+  visible in it: R14's logs read 5.7 kPa mean, R15's 4.0.
+
+- **Defects 1 and 2 together** — `logs_section` takes `cal=` and `cal_notes=`,
+  and always merges a `coverage` section via `findings_to_dict(extra=)` whether
+  or not a calibration was passed, because a promised section that sometimes
+  vanishes is worse than one that is sometimes all skips. `_op_advice_bundle`
+  passes `Tune.source_space()` — the **imported** bin, before any edit in this
+  session, which is the bin a log picked into the session was driven on, and not
+  the working buffer the old rationale objected to. A note naming that bin by
+  hash travels in the document, and `logs_on_session_bin: false` opts out for a
+  session whose logs came from elsewhere. The five curated coverage tables all
+  resolve on all four back-test cases; the SKIPPED list is now empty where it
+  used to hold both cal-aware checks.
+
+- **The fourth defect, found while checking the third** — the R15 answer
+  declined a sized edit to `IP_FAC_BPA_SP[1]` saying its two axis channels
+  "neither appear anywhere in this bundle". That was **true of the bundle and
+  false of the logs**: `exh_flow_factor` and `intake_flow_fact` are in the CSVs,
+  and coverage now resolves both wastegate tables from them. The bundle simply
+  never listed a log's channels. It does now (`logs[].channels`), and the guide
+  says to check there before calling a channel absent.
+
+Verification: 1164 library tests pass (was 1150 — 14 new); the Android engine's
+332 JVM tests pass and `verifyDebugNoPermissions` is clean; all four bundles
+re-export byte-deterministically. The bucket counts are unchanged and still
+under-powered — only re-answering moves them.
+
 ---
 
 ## Scope boundaries

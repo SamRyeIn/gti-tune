@@ -1,7 +1,7 @@
 ---
 date: 2026-08-27
 type: backtest
-status: all four cases answered and replayed
+status: four cases answered and replayed; the three bundle defects they exposed are fixed, the re-answer is not run
 plan: "[[2026-08-24-001-feat-tune-with-claude-courier-plan]]"
 scope: SC8S50 only
 ---
@@ -22,6 +22,17 @@ bundle reader into a throwaway directory outside this repository and runs a
 fresh `claude -p` there — no repo, no `CLAUDE.md`, no auto-memory, no lineage.
 Every run's full tool transcript is kept, and `replay` audits it. All audits so
 far report **no tool call named a path outside the sandbox**.
+
+> [!important] The bucket counts below are from bundles that no longer exist
+> Everything in this document was measured against bundles exported *before* the
+> three defects in § Why R14 and R15 returned nothing were fixed. Actions 1-3 of
+> § Recommended next actions have since landed and the four bundles have been
+> re-exported: `cal_resolved` is now true on all of them, all five coverage
+> tables resolve, the SKIPPED list is empty, every log's channel list travels,
+> and a `boost_shortfall` finding is present. **The `answer` calls have not been
+> re-run** — that is action 4, it costs ~$3.5 and 7-day rate limit, and it is the
+> only thing that moves the counts. Until it runs, read the counts as a
+> measurement of the *old* bundle, not of the answering side.
 
 ## Bucket counts
 
@@ -135,6 +146,15 @@ factor and neither channel appears anywhere in this bundle, so I cannot show
 which cells were visited or size a trim from evidence rather than from feel."*
 The guide told it to check coverage. There was none to check.
 
+> [!warning] That sentence was true of the bundle and false of the logs
+> `exh_flow_factor` and `intake_flow_fact` are both in the R14 CSVs, and with
+> coverage wired the maps for `IP_FAC_BPA_SP[0]` and `[1]` resolve from them —
+> 12 WOT cells hit on that case. The bundle simply never listed which channels a
+> log carried, so *"not in this bundle"* was the only honest reading available
+> and it pointed the wrong way. That is a fourth defect, found while fixing the
+> third, and the fix is `logs[].channels`: the canonical channel ids each file
+> holds, so a reader can tell an absent channel from an unmentioned one.
+
 ### 3. The analysis battery has no boost-shortfall check
 
 Separate root cause, and the one that fully explains R15. `simoscal.analysis`'s
@@ -203,17 +223,59 @@ stage 2 would be buying:
 
 In the order that would most change the bucket counts:
 
-1. **Add a boost-shortfall check to the battery.** Until one exists the courier
-   cannot reproduce a change of R15's kind however good the answering side is.
-   The signal is already computed inside the `wastegate` check.
-2. **Let a session declare that its bin is the one that was driven**, and pass
-   the calibration to `logs_section` when it does. That un-skips `boost_cal` and
-   `boost_p0234` and makes coverage computable, in one change.
-3. **Wire coverage into the bundle** via `findings_to_dict(..., extra=...)`, or
-   remove its row and its instruction from the answering guide. Promising a
-   section that cannot be produced is worse than not having it.
-4. **Re-run all four cases** once 1–3 land. Only then are the bucket counts
-   evidence about the answering side rather than about the bundle.
+1. ~~**Add a boost-shortfall check to the battery.**~~ **Done.** A tenth check
+   family, `boost_shortfall`, sits beside the overshoot check on the same two
+   channels. A zone is any run of *post-spool* samples where PUT sits below
+   setpoint — post-spool being settled samples at or after the first one where
+   PUT reached setpoint, which needs no wastegate channel — qualified on mean
+   depth **or** area (mean × duration). Not on a per-sample threshold: R14's
+   four-second ridge wanders between 3 and 9 kPa, and an entry line chopped it
+   into fragments that each looked like noise. Never a High; a shortfall costs
+   power, not pistons.
+
+   Each zone carries what the wastegate did across it — the integral's wind-up,
+   how far the final command ran above the position feedforward, the fraction of
+   the zone the gate spent commanded shut — which is what turns a description
+   into a direction: *the feedforward is asking too little and the loop is
+   covering for it* (raise the feedforward — R15's actual change) versus *the gate
+   is already shut* (no controller table will help).
+
+   Over the whole lineage it reads:
+
+   | Logs | Verdict | Worst zone             | WG integral across it |
+   |------|---------|------------------------|-----------------------|
+   | R01  | Low     | 0.17 s spool edge only | not logged            |
+   | R04  | Low     | 1.2 kPa mean / 1.04 s  | +1.0 pt               |
+   | R09  | Medium  | 6.4 kPa mean / 4.20 s  | −1.5% → +16.6%        |
+   | R11  | Medium  | 4.4 kPa mean / 5.44 s  | +0.7% → +15.0%        |
+   | R14  | Medium  | 5.7 kPa mean / 5.08 s  | −1.4% → +19.4%        |
+   | R15  | Medium  | 4.0 kPa mean / 4.76 s  | −1.0% → +14.5%        |
+   | R17  | Medium  | 5.6 kPa mean / 4.52 s  | −1.3% → +17.0%        |
+
+   R04 — the *overshoot* log — is Low, which is the false-alarm result that
+   matters. And the R15 edit is visible: R14's logs read 5.7 kPa mean, R15's
+   read 4.0 on the same signature, so the walk-back recovered roughly a third of
+   it and the feedforward is still leaving work to the integral.
+2. ~~**Let a session declare that its bin is the one that was driven.**~~
+   **Done, and it needed no declaration for the common case.** `logs_section`
+   takes `cal=`, and `_op_advice_bundle` passes `Tune.source_space()` — the
+   **imported** bin as it stood before any edit in this session. That is the bin
+   a log picked into the session was driven on, and it is not the working buffer
+   the old rationale objected to, so the pessimistic default was answering an
+   objection that did not apply. A note naming that bin by hash travels in the
+   document, and `logs_on_session_bin: false` opts out for a session whose logs
+   came from somewhere else.
+3. ~~**Wire coverage into the bundle.**~~ **Done.** `logs_section` merges a
+   `coverage` section via `findings_to_dict(extra=)` **whether or not** a
+   calibration was passed — with none, it is all skips with reasons. A promised
+   section that sometimes vanishes is worse than one that is sometimes empty.
+   The serialiser (`coverage_to_dict`) is now shared with the evidence layer, so
+   a bundle's coverage and a folder's `analysis_findings.json` cannot describe
+   the same logs differently.
+4. **Re-run all four cases.** *Not done — the one remaining action, and the only
+   one that moves the bucket counts.* ~$3.5 and 7-day rate limit for four
+   `answer` calls, so it is Sam's call. The four bundles are already
+   re-exported and byte-deterministic, so `answer` is the only step left.
 5. **Carry the active switch-patch slot in the bundle.** Three independent
    sessions reconstructed it numerically — matching peak PUT minus logged
    overshoot to eight significant figures — before they could say anything about

@@ -212,7 +212,13 @@ def cmd_list(args) -> None:
 
 
 def cmd_export(args) -> None:
-    from simoscal.advice.bundle import bundle, logs_section, render, write_bundle
+    from simoscal.advice.bundle import (
+        bundle,
+        logs_section,
+        render,
+        source_calibration,
+        write_bundle,
+    )
 
     case = CASES[args.rev]
     tune, provenance = _open_session(case)
@@ -220,7 +226,13 @@ def cmd_export(args) -> None:
     if not paths:
         sys.exit(f"no simostools-*.csv in {case.logs_dir}")
 
-    logs = logs_section(paths, names={str(p): p.stem for p in paths})
+    # The reconstruction's whole premise is that `state_bin` is the bin these
+    # logs were recorded on, so the cal-aware checks and the coverage maps get
+    # it — same as the app's own export does for a session opened on the bin it
+    # flashed. This is the fix for back-test findings 1 and 2.
+    cal, cal_notes = source_calibration(tune)
+    logs = logs_section(paths, names={str(p): p.stem for p in paths},
+                        cal=cal, cal_notes=cal_notes)
     payload = bundle(
         tune, provenance=provenance, logs=logs,
         log_names=[p.stem for p in paths], notes=NOTES,
