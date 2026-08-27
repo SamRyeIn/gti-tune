@@ -9,8 +9,19 @@ References/
 # the scripts + REV_LOG.md are the record
 *_out/
 
+# Generated tutorial media — build_tutorial.zsh regenerates audio, frames and
+# scenes from narration/ and callouts/. Same rule as *_out/: the script and its
+# text inputs are the record. NOTE: the screen recordings it cuts frames from
+# live in /tmp and are not in the repo, so keep those if a rebuild matters.
+Docs/simoscal-android-tutorial/build/
+
 # ECU binaries (VW firmware-derived; regenerable from scripts + stock bin)
 *.bin
+
+# XDF definitions — third-party, not ours to redistribute (LICENSE-THIRD-PARTY).
+# References/ and BinToolz-main/ are already ignored wholesale; this catches an
+# XDF dropped anywhere else in the tree. This remote is public.
+*.xdf
 
 # Python bytecode
 __pycache__/
@@ -23,3 +34,21 @@ __pycache__/
 
 # Third-party tuning guides (source .docx) — kept locally, not redistributed
 Docs/*.docx
+
+# Back-test artifacts: reproducible via Docs/backtest/backtest.py, and a
+# bundle is the whole decoded calibration in the clear — this remote is public.
+# `**` rather than `*` so a nested or archived run cannot slip past: `a/**/b`
+# matches zero or more intervening directories, so these cover both
+# Docs/backtest/R14/reply.json and Docs/backtest/_archive_old_bundle/R14/reply.json.
+Docs/backtest/**/bundle.json
+Docs/backtest/**/reply.json
+Docs/backtest/**/replay.json
+Docs/backtest/**/replay.md
+Docs/backtest/**/state.json
+Docs/backtest/**/answer_transcript.jsonl
+Docs/backtest/**/answer_command.txt
+Docs/backtest/**/answer_audit.txt
+Docs/backtest/__pycache__/
+
+# Session-local resume checkpoint, not project config.
+.claude/RESUME.md
