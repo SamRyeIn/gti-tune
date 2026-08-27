@@ -10,15 +10,17 @@ This file now lives at the `Tunes/` root and spans both project folders: it
 tracked `TuningBasicsGuide` (R00–R15) alone until R15, and continues into
 `MainTune` (R16 onward) — see `REV_LOG.md` for the project split.
 
-Current lineage tip: **R16 — replacement build verified, awaiting Sam's human
-review and CAL flash** (see `REV_LOG.md`). R15 is flashed, logged, and reviewed in
-`Logs/BasicsGuide_R15/log_review.md`.
+Current lineage tip: **R18 — built and verified; awaiting human review and CAL
+flash before controlled validation**. It applies the isolated 4500–5000 rpm
+timing correction required by `Logs/BasicsGuide_R17/log_review.md`. R16 was
+never flashed, and R17 should receive no further WOT validation unchanged.
 
 **`Tunes/MainTune/` is active** for R16 onward, with output bins renamed to
 `Patched_259L_R<NN>.bin` (dropping the `CB_HSL_SP2933_..._BasicsGuide_` prefix
-used through R15). R16 is the first built MainTune revision. Its verified
-candidate is `MainTune_out/R16_20260825-140451/Patched_259L_R16.bin`; the script
-is `TUNE_MainTune_R16.py`.
+used through R15). R16 is the first MainTune revision; R18 is the current
+verified candidate at
+`MainTune_out/R18_20260826-171645/Patched_259L_R18.bin`. Its script is
+`TUNE_MainTune_R18.py`.
 
 **R14 was the first real calibration change in the `simoscal.tune` API** — a stock
 map on slot 1 and the drivable slots ordered least→most aggressive (1 stock
@@ -95,44 +97,74 @@ What would unblock it:
   loop is also blind above it, and a 26 psi target that transiently rails it is a
   design constraint, not just a logging nuisance.
 
-## R16 — built; next action is human review, flash, and logging
+## R16 — superseded unflashed by R17
 
-R16 moved out of the idea queue after the verified
-`MainTune_out/R16_20260825-140451/` replacement build. Its authoritative rationale, exact
-targets, hashes, changed-byte scope, and automated gate results are in
-`REV_LOG.md` § R16. Review `report.md`,
-the Spark-IAT review assets, and all nine
+R16's verified build remains documented in `REV_LOG.md` § R16, but it is no
+longer the flash candidate. Its EQT-derived high-RPM base advance stacked with
+the new exact Spark-IAT correction before either change was validated in-car.
+R17 retains the Spark-IAT family and removes the base-timing overlay.
+
+## R17 — flashed and logged; local timing correction required
+
+R17 writes the complete starting-values matrix from
+`knowledge/ecu-tuning-basics.md` § Timing into all nine
 `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0
-port-flap-low cam-position heatmaps before any human-performed CAL flash.
+port-flap-low cam-position maps. It removes both the R16 EQT advance and every
+R04 retard cell; all other calibration behavior remains identical to R16.
 
-Validation protocol on slot 4 and 92-octane fuel:
+The 2026-08-26 slot-4 session supplies six full actual-3rd-gear pulls and four
+WOT 3→4 shifts. Boost, steady lambda, rail hold, turbo speed, and limiters remain
+controlled. The old shift-overboost question is now closed: all four shifts stay
+below +10 kPa PUT error, although one reaches −24.5 bar DI rail error and another
+reaches 99.2 % HPFP effective volume, so no additional boost is justified.
 
-1. Capture one controlled actual-3rd-gear pull to redline without stacking
-   back-to-back attempts. The EQT-matched table curve begins at 5000 rpm and
-   includes the known cylinder-1 susceptibility around 5500 rpm.
-2. If the first pull is clean, capture one separate controlled pull in the
-   30–40.5 °C IAT region without deliberately creating unsafe heat soak. The
-   Spark-IAT and EQT-table changes overlap and must be reviewed together.
-3. Run `python -m simoscal.analysis Logs/MainTune_R16` and author
-   `Logs/MainTune_R16/log_review.md`. Compare 5000+ rpm `Ign Table`, `Ign Avg`,
-   `Knock Cyl 1-4`, IAT, lambda, DI rail hold, HPFP effective volume, boost
-   tracking, turbo speed, and the physics-derived power curve against R14/R15.
+The timing gate does not pass unchanged. Three settled high-airmass events recur
+at 4563, 4830, and 4973 rpm across three pulls and cylinders 1/4, each reaching
+−3.0°. A separate −2.6° event occurs during spool at 3380 rpm. The three settled
+events meet `knowledge/ecu-tuning-not-the-basics.md`'s criterion for consistent
+knock in a defined rpm range rather than random single-cylinder noise. Full
+evidence and the battery's lambda-transition downgrade are in
+`Logs/BasicsGuide_R17/log_review.md`.
 
-Expected table output follows 1.875° at 5000, 3.750° at 5500, 6.000° at 6000,
-and 8.250° at 6500 rpm across 1050–1400 mg/stk; delivered timing remains subject
-to IAT and other corrections. Recurring retard in the changed band, any fresh
-multi-cylinder event, a deeper or longer cylinder-1 event, loss of
-fuel-pressure/lambda control, or protection that prevents delivery is a
-stop/rollback signal.
+## R18 — isolated 4500–5000 rpm timing correction
 
-## R17 — blocked on R16 validation
+R18 is built and verified with one narrow change in all nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0
+port-flap-low cam-position maps. At both 1200 and 1400 mg/stk, 4500 rpm moves
+from −3.000° to −3.750° and 5000 rpm moves from −0.750° to −2.250°. The 5000
+rpm values restore R04 exactly; the 4500 rpm value restores R04 at 1400 mg/stk
+and extends the same target to 1200 mg/stk for load consistency.
 
-Do not add more timing, change knock detection, or combine a timing increase
-with a boost/wastegate change until the R16 logs are reviewed. R16 now copies
-the EQT log's table-output curve rather than its final timing and retains stock
-knock detection. The known 4300–4750 rpm / high-airmass knock region remains
-excluded, while the 5000–6500 rpm region requires explicit validation because
-the replacement R16 supersedes prior R04 protection there.
+The authoritative candidate is
+`MainTune_out/R18_20260826-171645/Patched_259L_R18.bin`, SHA-256
+`b3bf96a47e0c6ab704401c09e36939b24eebdd76472ae080f9fd435205cb9bfd`.
+Its raw-diff audit against R17 is clean: 36 journaled timing bytes plus four
+checksum bytes, zero unexplained. Independent decoding found exactly the nine
+intended timing maps changed among all 3814 tables; every other calibration
+table is byte-identical to R17.
+
+The R17 Spark-IAT family, boost, wastegate, lambda, pump, limiter, and
+knock-control calibrations remain byte-identical. In particular,
+`IP_KNKS_GAIN_PRE[0..3]` — Knock pre-window gain for cylinders 1–4,
+`IP_IGA_DEC_KNK` — Spark retard at recognised knocking, and
+`IP_IGA_INC_KNK` — Increasing value of knock integrated correction when knock
+is detected are unchanged. Do not stack another calibration change before the
+R18 timing pocket is validated.
+
+Validate with normal full actual-3rd-gear WOT pulls to redline on slot 4 and
+92-octane fuel. The R17 knock this revision answers was isolated, settled,
+single-cylinder −3.0° retard that decayed normally, with factory knock
+protection intact — the ECU doing its job, not a damage signature — so no short
+containment pass is warranted. Stop and roll back only on a change in
+character: simultaneous multi-cylinder retard, retard that ramps rather than
+decays, loss of lambda or fuel-pressure control, or protection-limited timing
+delivery.
+
+Read the 5000–5700 rpm band on its own terms in the next logs: R18 edits only
+the 4500 and 5000 rpm breakpoints, so the pull is fully handed back by 5500 rpm
+and the interpolated advance crosses back through the R17 knock-onset value near
+5230 rpm. R16 remains superseded and must not be substituted because it
+requested still more high-rpm base timing.
 
 Conventions: name every table as `` `ID` — Description `` (both, always). Switch-patch
 tables are patch-added and have **no A2L IDs** — reference them by title. See

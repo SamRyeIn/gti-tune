@@ -27,25 +27,27 @@ patch code. Use a full flash again when introducing, removing, or changing a
 patch/code component, or when the installed patch state is unknown. Flashing and
 the final review remain human-only steps.
 
-| Revision | Script                     | Summary                                                                                                                                                                                                                                                                                                                                                   |
-| -------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R00      | `TUNE_Basics_Guide_R00.py` | Initial revision. Base ecu-tuning-basics SOP + lambda axis re-breakpoint.                                                                                                                                                                                                                                                                                 |
-| R01      | `TUNE_Basics_Guide_R01.py` | R00 + six limiter/fuelling writes the recipe left at stock.                                                                                                                                                                                                                                                                                               |
-| R02      | `TUNE_Basics_Guide_R02.py` | Report-honesty only; bin byte-identical to R01.                                                                                                                                                                                                                                                                                                           |
-| R03      | `TUNE_Basics_Guide_R03.py` | R02 + literal 0.80 writes to the three lambda minimum-value floors.                                                                                                                                                                                                                                                                                       |
-| R04      | `TUNE_Basics_Guide_R04.py` | R03 + local WOT knock-retard ignition overlay.                                                                                                                                                                                                                                                                                                            |
-| R05      | `TUNE_Basics_Guide_R05.py` | R04 + wastegate feedforward overlay + X-axis re-breakpoint to cut overboost.                                                                                                                                                                                                                                                                              |
-| R06      | `TUNE_Basics_Guide_R06.py` | R05 + overboost limiter symbol-map fix (now applies 1800→2700 across 6 cells).                                                                                                                                                                                                                                                                            |
-| R07      | `TUNE_Basics_Guide_R07.py` | R06 calibration on a PATCHED bin: CBRICK + HSL + 5-slot switch patch, switch-patch TC enabled on all 5 slots. Full flash to install the patch set; later matching-patch tune updates are CAL-flash eligible.                                                                                                                                              |
-| R08      | `TUNE_Basics_Guide_R08.py` | R07 + top-end wastegate FF deepening: 6 cells lowered in IP_FAC_BPA_SP[0]/[1], row-weighted onto Int 1.05. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                                                                       |
-| R09      | `TUNE_Basics_Guide_R09.py` | R08 + slot-2 boost to a 26 psi shelf: base IP_PUT_SP reshape + slot 1/3/4/5 PUT caps hold R08. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                                                                                   |
-| R10      | `TUNE_Basics_Guide_R10.py` | R09 + reshape IP_PQ_CHA_MAX (max compressor pressure ratio): 1.70 @ 1000 rpm, flat 3.1 @ 2000-7000 rpm, to clear the code-128 cap trimming the shelf. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                            |
-| R11      | `TUNE_Basics_Guide_R11.py` | R10 + park `IP_PUT_SP` — Pressure up throttle setpoint at 30 psi gauge-equivalent full-load ceiling; all five switch-patch `PUT setpoint` grids become explicit lower caps on a shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed.                                                                                        |
-| R12      | `TUNE_Basics_Guide_R12.py` | R11 + repurpose slot 5 as a valet map: its patch `PUT setpoint` grid is a flat 1705 hPa absolute cap (9.993 psi gauge) across the shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                      |
-| R13      | `TUNE_Basics_Guide_R13.py` | No calibration change. Re-declares the complete R00–R12 calibration in the `simoscal.tune` API as one flat script (zero imports from other revisions); output bin byte-identical to R12. Do not flash.                                                                                                                                                    |
-| R14      | `TUNE_Basics_Guide_R14.py` | R13 calibration + add a stock map (slot 1, factory `IP_PUT_SP` boost target ~21.6 psi read live from the stock bin) and reorder the drivable slots least→most (1 stock, 2 conservative, 3 intermediate, 4 aggressive); slot 5 valet unchanged. Only the four per-slot `PUT setpoint` grids move. CAL-flash eligible after the R07 patch set is installed. |
-| R15      | `TUNE_Basics_Guide_R15.py` | R14 calibration + walk back R08's wastegate deepening in the five `IP_FAC_BPA_SP[0]`/`[1]` cells the R14 logs show under-delivering, every value bounded at its R07 level. Only the two wastegate feedforward maps move. CAL-flash eligible after the R07 patch set is installed.                                                                         |
+| Revision | Script                     | Summary                                                                                                                                                                                                                                                                                                                                                                  |
+| -------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R00      | `TUNE_Basics_Guide_R00.py` | Initial revision. Base ecu-tuning-basics SOP + lambda axis re-breakpoint.                                                                                                                                                                                                                                                                                                |
+| R01      | `TUNE_Basics_Guide_R01.py` | R00 + six limiter/fuelling writes the recipe left at stock.                                                                                                                                                                                                                                                                                                              |
+| R02      | `TUNE_Basics_Guide_R02.py` | Report-honesty only; bin byte-identical to R01.                                                                                                                                                                                                                                                                                                                          |
+| R03      | `TUNE_Basics_Guide_R03.py` | R02 + literal 0.80 writes to the three lambda minimum-value floors.                                                                                                                                                                                                                                                                                                      |
+| R04      | `TUNE_Basics_Guide_R04.py` | R03 + local WOT knock-retard ignition overlay.                                                                                                                                                                                                                                                                                                                           |
+| R05      | `TUNE_Basics_Guide_R05.py` | R04 + wastegate feedforward overlay + X-axis re-breakpoint to cut overboost.                                                                                                                                                                                                                                                                                             |
+| R06      | `TUNE_Basics_Guide_R06.py` | R05 + overboost limiter symbol-map fix (now applies 1800→2700 across 6 cells).                                                                                                                                                                                                                                                                                           |
+| R07      | `TUNE_Basics_Guide_R07.py` | R06 calibration on a PATCHED bin: CBRICK + HSL + 5-slot switch patch, switch-patch TC enabled on all 5 slots. Full flash to install the patch set; later matching-patch tune updates are CAL-flash eligible.                                                                                                                                                             |
+| R08      | `TUNE_Basics_Guide_R08.py` | R07 + top-end wastegate FF deepening: 6 cells lowered in IP_FAC_BPA_SP[0]/[1], row-weighted onto Int 1.05. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                                                                                      |
+| R09      | `TUNE_Basics_Guide_R09.py` | R08 + slot-2 boost to a 26 psi shelf: base IP_PUT_SP reshape + slot 1/3/4/5 PUT caps hold R08. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                                                                                                  |
+| R10      | `TUNE_Basics_Guide_R10.py` | R09 + reshape IP_PQ_CHA_MAX (max compressor pressure ratio): 1.70 @ 1000 rpm, flat 3.1 @ 2000-7000 rpm, to clear the code-128 cap trimming the shelf. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                                           |
+| R11      | `TUNE_Basics_Guide_R11.py` | R10 + park `IP_PUT_SP` — Pressure up throttle setpoint at 30 psi gauge-equivalent full-load ceiling; all five switch-patch `PUT setpoint` grids become explicit lower caps on a shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed.                                                                                                       |
+| R12      | `TUNE_Basics_Guide_R12.py` | R11 + repurpose slot 5 as a valet map: its patch `PUT setpoint` grid is a flat 1705 hPa absolute cap (9.993 psi gauge) across the shared 12-point RPM axis. CAL-flash eligible after the R07 patch set is installed.                                                                                                                                                     |
+| R13      | `TUNE_Basics_Guide_R13.py` | No calibration change. Re-declares the complete R00–R12 calibration in the `simoscal.tune` API as one flat script (zero imports from other revisions); output bin byte-identical to R12. Do not flash.                                                                                                                                                                   |
+| R14      | `TUNE_Basics_Guide_R14.py` | R13 calibration + add a stock map (slot 1, factory `IP_PUT_SP` boost target ~21.6 psi read live from the stock bin) and reorder the drivable slots least→most (1 stock, 2 conservative, 3 intermediate, 4 aggressive); slot 5 valet unchanged. Only the four per-slot `PUT setpoint` grids move. CAL-flash eligible after the R07 patch set is installed.                |
+| R15      | `TUNE_Basics_Guide_R15.py` | R14 calibration + walk back R08's wastegate deepening in the five `IP_FAC_BPA_SP[0]`/`[1]` cells the R14 logs show under-delivering, every value bounded at its R07 level. Only the two wastegate feedforward maps move. CAL-flash eligible after the R07 patch set is installed.                                                                                        |
 | R16      | `TUNE_MainTune_R16.py`     | First MainTune revision. R15 calibration + exact guide-author Spark IAT axis/grid, a curve-preserving shared-axis migration of the Reference IGA correction, and the EQT Stage 2 log's 5000-rpm-up `Ignition Table Output` curve across 1050/1200/1400 mg/stk in all nine VVL-0 port-flap-low base-timing maps. CAL-flash eligible after the R07 patch set is installed. |
+| R17      | `TUNE_MainTune_R17.py`     | R16 calibration with all R04 and R16 base-timing overlays removed: every cell in all nine `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0 port-flap-low maps matches the tuning basics guide exactly; the R16 Spark-IAT family remains unchanged. CAL-flash eligible after the R07 patch set is installed.                                        |
+| R18      | `TUNE_MainTune_R18.py`     | R17 calibration + a logged local timing correction in all nine `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0 port-flap-low maps: −0.75° at 4500 rpm and −1.50° at 5000 rpm in the 1200/1400 mg/stk rows. All other calibration tables stay byte-identical to R17. CAL-flash eligible after the R07 patch set is installed.                      |
 
 ## R00 — Initial revision
 
@@ -1233,4 +1235,195 @@ the requested timing from being delivered is a rollback signal. No further
 timing increase is authorized until those logs are reviewed.
 
 Still **revision 16 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.
+
+## R17 — restore the complete tuning-guide base-timing table
+
+**⚠ CAL flash eligible after R07 patch installation.** R17 retains R07's
+CBRICK, HSL, and switch-patch 29.33 ASW/code components byte-identically and
+moves calibration bytes only. Flashing and the final review gate remain human
+steps.
+
+R17 supersedes the unflashed R16 candidate. After comparing R16/R17 against the
+starting-values table in `knowledge/ecu-tuning-basics.md` § Timing, Sam directed
+R17 to remove both R16's EQT-derived high-RPM advance and every older R04
+knock-retard cell. The reason for returning to the guide baseline is attribution:
+R16 already added the exact Spark-IAT correction, so retaining a large base-table
+advance would stack two timing changes before either was validated in-car.
+
+### Complete guide table
+
+The script embeds the guide's full 16 × 16 encoded matrix and writes it to all
+nine `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0
+port-flap-low cam-position maps. It then asserts every staged cell against that
+matrix before the build can proceed. Relative to R16:
+
+| Removed overlay               | Cells per map | R16 → R17 delta      | Effect                                                                         |
+| ----------------------------- | ------------- | -------------------- | ------------------------------------------------------------------------------ |
+| R16 EQT high-RPM advance      | 11            | −2.250 to −4.875°CRK | Restores the guide at 5000–6500 rpm / 1050–1400 mg/stk.                        |
+| Remaining effective R04 cells | 7             | +0.750 to +2.250°CRK | Restores the guide in the prior knock region and two high-RPM 900 mg/stk cells. |
+
+The resulting curves are the guide curves without scaling, blending, or a
+derived smoothing factor. `IP_IGA_BAS_TEMP_N_32` — Basis for temperature
+correction of Basic IGA versus N_32, TIA, `IP_IGA_REF_TEMP_N_32` — Basis for
+temperature correction of Reference IGA versus N_32, TIA, and their shared
+axes remain byte-identical to R16. Stock knock detection remains untouched.
+
+### Verification (authoritative run `R17_20260826-120335`)
+
+- Output: `Tunes/MainTune/MainTune_out/R17_20260826-120335/Patched_259L_R17.bin`.
+  SHA-256:
+  `5b011833c32484cfa1afe7d7154971187e777dae497f1bc4086d56134b5fc31b`.
+- R16 byte-audit reference SHA-256:
+  `061d878dee5d5229e9273b5e9ca7c5ad5e4706475639623f73c253bc0c2021bd`.
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`); final-bin readback **PASS** for all
+  139 touched tables; switch-patch sanity **PASS** — 123/123 tables resolved
+  and decoded, 52 differ from stock.
+- Raw-diff audit vs R16 **CLEAN** — 166 changed bytes, all attributed:
+  162 journaled base-timing bytes plus 4 stored-checksum bytes; unexplained = 0.
+- Independent XDF decode read all 3814 tables with zero errors and found exactly
+  nine changed calibration tables: the nine base-ignition maps. Every other
+  decoded calibration table is byte-identical to R16.
+- Each changed map matches the guide's complete encoded 16 × 16 matrix
+  cell-for-cell. Each differs from R16 in exactly 18 cells: 11 lower and 7
+  higher, with deltas from −4.875 to +2.250°CRK.
+- Focused library tests: **80 passed**. The untouched recovery image retained
+  SHA-256 `d61a6e297b3ac1d25f60ec8cb3bb504ff47f2db603a960a56e6a6e34074ad69b`.
+- Visual review of the R16→R17 column and heatmap comparisons confirms the
+  finished curves reproduce the guide shape. Review all nine comparison sets.
+
+The earlier `R17_20260826-114316` smoothing candidate is superseded, and
+`R17_20260826-115840` is an interrupted, incomplete run. Only the authoritative
+run above is eligible for human review.
+
+### Human review and logging gate
+
+R17 removes R04 protection from the documented 3500–4500 rpm / high-airmass
+knock region. The Spark-IAT correction is temperature-dependent and must not be
+treated as unconditional replacement protection, especially at cool IAT where
+it commands no retard. Before any CAL flash, review all nine timing plots and
+confirm the exact R07 patch set remains installed.
+
+For the first human-performed validation use slot 4 and 92-octane fuel. Capture
+one controlled actual-3rd-gear pull without stacking attempts, then inspect the
+3500–4750 rpm region before considering a second pull to redline. Review all four
+knock channels, delivered-versus-table timing, IAT, lambda, DI rail pressure,
+HPFP effective volume, boost tracking, turbo speed, and physics-derived power.
+Any recurring knock, multi-cylinder event, loss of fuel/lambda control, or
+protection-limited timing delivery is a stop/rollback signal.
+
+### In-car validation (2026-08-26)
+
+R17 was CAL-flashed by the human and logged on slot 4 with 92-octane fuel. The
+seven-file session contains six complete actual-3rd-gear pulls and four WOT
+3→4 shifts. The full authored review is
+`Logs/BasicsGuide_R17/log_review.md`; the deterministic battery ran every check
+with none skipped.
+
+Boost, steady lambda, rail hold, turbo speed, torque limiting, and misfires
+remain controlled. Four WOT shifts land at 4395–4472 rpm with only +4.7 to
++9.3 kPa peak PUT error, closing the prior shift-overboost question. Fuel
+headroom remains the reason not to add boost: the worst shift reaches −24.5 bar
+DI rail error and another reaches 99.2 % HPFP effective volume.
+
+The timing gate does not pass unchanged. Three settled events recur at
+4563–4973 rpm and 1480–1511 mg/stk across three separate pulls and cylinders 1
+and 4, each reaching −3.0° knock retard. A fourth −2.6° event occurs during
+spool at 3380 rpm. This is a repeatable rpm/load pocket under the criterion in
+`knowledge/ecu-tuning-not-the-basics.md`, not isolated noise without a pattern.
+R18 is therefore unblocked only as a local base-timing correction in the
+4500–5000 rpm / 1200–1400 mg/stk region across all nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0
+port-flap-low cam-position maps. Knock sensitivity/correction behavior and all
+other calibration domains stay unchanged so the next logs isolate that fix.
+
+Still **revision 17 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.
+
+## R18 — local 4500–5000 rpm timing correction
+
+**⚠ CAL flash eligible after R07 patch installation.** R18 retains R07's
+CBRICK, HSL, and switch-patch 29.33 ASW/code components byte-identically and
+moves calibration bytes only. Flashing and the final review gate remain human
+steps.
+
+R18 responds to the three settled R17 knock events at 4563–4973 rpm and
+1480–1511 mg/stk. Each event reached −3.0° across cylinders 1 and 4, so the
+repeatable rpm/load pocket meets the advanced guide's criterion for a local
+base-timing change. No knock-sensor gain, knock-correction, boost, wastegate,
+fueling, limiter, pump, Spark-IAT, or switch-slot change is stacked into this
+revision.
+
+### Exact timing correction
+
+Four cells per map change in all nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0
+port-flap-low cam-position maps:
+
+| Engine speed | Airmass rows       | R17 value | R18 value | Delta    |
+| ------------ | ------------------ | --------- | --------- | -------- |
+| 4500 rpm     | 1200 / 1400 mg/stk | −3.000°   | −3.750°   | −0.750°  |
+| 5000 rpm     | 1200 / 1400 mg/stk | −0.750°   | −2.250°   | −1.500°  |
+
+The values are exact multiples of the ECU's 0.375°CRK storage step. The 5000
+rpm targets restore R04's prior values at both loads. The 4500 rpm target
+restores R04's prior 1400 mg/stk value and extends it to 1200 mg/stk so the two
+high-load rows remain consistent rather than introducing a load-direction
+step. The 4500-rpm pull is two encoding steps (0.750° = 2 × 0.375°) and the
+5000-rpm pull is four; the stronger 5000-rpm pull covers the two events nearest
+that breakpoint while remaining within R04's proven bound. That −3.750° target
+at 4500 rpm / 1200 mg/stk is also exactly R04's own interpolated value there,
+midway between its (4000, 1200) = −5.25° and (5000, 1200) = −2.25° targets, so
+all four R18 cells sit on R04's surface rather than merely near it.
+
+`IP_KNKS_GAIN_PRE[0..3]` — Knock pre-window gain for cylinders 1–4,
+`IP_IGA_DEC_KNK` — Spark retard at recognised knocking, and
+`IP_IGA_INC_KNK` — Increasing value of knock integrated correction when knock
+is detected remain unchanged. Factory knock protection therefore continues to
+report and control any residual event.
+
+### Verification (authoritative run `R18_20260826-171645`)
+
+- Output: `Tunes/MainTune/MainTune_out/R18_20260826-171645/Patched_259L_R18.bin`.
+  SHA-256:
+  `b3bf96a47e0c6ab704401c09e36939b24eebdd76472ae080f9fd435205cb9bfd`.
+- R17 byte-audit reference SHA-256:
+  `5b011833c32484cfa1afe7d7154971187e777dae497f1bc4086d56134b5fc31b`.
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`); final-bin readback **PASS** for all
+  139 touched tables; switch-patch sanity **PASS** — 123/123 tables resolved
+  and decoded, 52 differ from stock.
+- Raw-diff audit vs R17 **CLEAN** — 40 changed bytes, all attributed: 36
+  journaled timing bytes plus 4 stored-checksum bytes; unexplained = 0.
+- Independent XDF decode read all 3814 tables with zero errors and found exactly
+  nine changed calibration tables: the nine base-ignition maps. Each differs
+  in exactly the four cells above; every other decoded calibration table is
+  byte-identical to R17.
+- Representative R17→R18 column and heatmap comparisons were visually
+  inspected and show only the intended two-rpm/two-load pocket. All nine maps
+  were independently asserted identical to one another after the edit.
+- Focused ignition-domain tests: **21 passed**. Script compilation passed, and
+  the untouched recovery image retained SHA-256
+  `d61a6e297b3ac1d25f60ec8cb3bb504ff47f2db603a960a56e6a6e34074ad69b`.
+
+### Human review and logging gate
+
+R18 is a verified candidate, not a validated calibration. After reviewing the
+nine timing comparison sets, the human may CAL-flash it only if the exact R07
+patch set is confirmed installed. Validate with normal full actual-3rd-gear WOT
+pulls to redline on slot 4 and 92-octane fuel — no short containment pass. The
+R17 knock this revision answers was three isolated, settled, single-cylinder
+−3.0° events that decayed normally, on a bin with factory knock protection
+intact; that is the ECU working, not an engine-damage signature, and it does not
+justify holding the car short of redline.
+
+What would change that judgement is a change in *character*, not another −3.0°
+event: simultaneous multi-cylinder retard, retard that ramps instead of decaying,
+loss of lambda or fuel-pressure control, or protection-limited timing delivery.
+Any of those is a stop/rollback signal. Note also that R18 pulls timing only at
+the 4500 and 5000 rpm breakpoints, so its correction is fully handed back by
+5500 rpm; the interpolated advance climbs back through the R17 knock-onset value
+at roughly 5230 rpm. Read the 5000–5700 rpm band in the next logs on its own
+terms rather than assuming the pocket correction covers it.
+
+Still **revision 18 — a starting point, not a finished calibration**. The script
 and build pipeline never flash an ECU.
