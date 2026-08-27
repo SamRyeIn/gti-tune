@@ -75,8 +75,8 @@ From the origin doc (goals G1–G6, acceptance examples AE1–AE8):
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D1 | **Dry-run through the real edit path.** Add `dry_run` to `apply_op` and the domain edit calls; same guards, same encode, same `EditRejected`, journal untouched. | One validation implementation with two entry points. The alternatives (apply-then-undo, throwaway session) either put unaccepted edits in the journal transiently or hold a second multi-MB `Tune` on a tablet. *Chosen without confirmation — the fork was raised and dismissed; overturn here if wrong.* |
-| D2 | **Bundle assembly and reply parsing live in Python bridge ops.** | Catalog, journal, and log data already originate in Python; Kotlin would re-serialize what Python just serialized. Host-testable, and the back-test (U8) can then run with no app in the loop — which is the point of the back-test. *Same status as D1.* |
+| D1 | **Dry-run through the real edit path.** Add `dry_run` to `apply_op` and the domain edit calls; same guards, same encode, same `EditRejected`, journal untouched. | One validation implementation with two entry points. The alternatives (apply-then-undo, throwaway session) either put unaccepted edits in the journal transiently or hold a second multi-MB `Tune` on a tablet. *Confirmed by Sam 2026-08-24.* |
+| D2 | **Bundle assembly and reply parsing live in Python bridge ops.** | Catalog, journal, and log data already originate in Python; Kotlin would re-serialize what Python just serialized. Host-testable, and the back-test (U8) can then run with no app in the loop — which is the point of the back-test. *Confirmed by Sam 2026-08-24.* |
 | D3 | **No new write path.** Recommendations are replayed through the existing ops (`edit`, `boost_edit`, `boost_rpm_axis`, `slot_flag`, `limiters_edit`, `lambda_fl_edit`). | `bridge.py` states the rule: an op exists when the write carries an invariant no grid edit can see. A recommendation is not a new invariant, so it gets no new write op — it gets the ones that already exist. |
 | D4 | **Two new ops, both read-only-ish and additive.** `advice_bundle` (pure read) and `advice_review` (dry-run replay, journals nothing). | Additive ops leave `BRIDGE_VERSION` alone, per the precedent set by the V8 and domain-screen ops: an older app never names them, a newer app on an older engine gets a clean `UNKNOWN_OP`. |
 | D5 | **The recommendations schema is versioned independently** of `BRIDGE_VERSION`. | The reply file is authored *outside* the app by a model, and will change shape faster than the bridge. A mismatch must be a clean, explained rejection, not a misread field. |
@@ -480,6 +480,31 @@ reply imported → reviewed → queue. Testable on the JVM, like every other
 `verifyReleaseNoPermissions` pass unchanged; `AdviceUiState` transitions are
 covered by JVM tests.
 
+**Implementation result (2026-08-25)** — Host implementation complete on
+`app: feat/tune-with-claude-courier`; the physical-device leg remains open. The
+transport lives on the Build screen rather than adding U7's navigation early:
+optional logs and notes export through `advice_bundle`, a typed sibling
+`ShareBundle` shares only the generated JSON, and an imported reply is copied
+and hashed by the existing `ImportStore` discipline before `advice_review`
+returns queue/refused/malformed counts. The full parsed queue is retained in
+pure `AdviceUiState` for U7, but no item is rendered or actionable yet.
+
+The existing FileProvider `staging/` root already included
+`staging/bundles/...`; U6 corrected its documentation and added an instrumentation
+test rather than adding an overlapping path entry. `imports/` remains absent.
+All 332 JVM tests pass, the debug APK assembles, and both merged-manifest gates
+report no unexpected permissions. No device was connected, so the FileProvider
+instrumentation test and export → share → import round trip were not run.
+
+One planned stale check was narrower than the schema can support. Recommendation
+provenance identifies the profile, source-bin hash, and XDF hash; editing the
+working session changes none of those. U6 therefore invalidates any bundle,
+imported reply, and review already held by the app after every successful edit,
+undo, or redo. It cannot detect a reply exported before an edit but imported
+only afterward. Detecting that case requires a deterministic session-state
+fingerprint in U2/U4/U5's bundle and reply provenance; it is not silently claimed
+as completed here.
+
 ---
 
 ### U7. Kotlin — the review queue
@@ -604,6 +629,47 @@ comparisons; the **Wrong** bucket is enumerated with a disposition for each
 entry; the fixture regression test is in the library suite. Each back-test
 folder's bundle names `SC8S50` in its provenance, so the scope limit is visible
 in the artifacts rather than only in this plan.
+
+**Implementation result (2026-08-27)** — The rig is built and four cases are
+defined (R10, R14, R15, R16; R10 was added beyond the plan's three because its
+actual change was torque-limiter driven and the battery has that check). The
+answering guide and the `answer-bundle` skill exist. Blind answering is
+*enforced* rather than promised: `answer` runs a fresh `claude -p` in a
+throwaway directory outside the repo with no `CLAUDE.md`, no auto-memory and no
+lineage, and `replay` audits the transcript for any path outside the sandbox.
+Every audit so far is clean.
+
+**The bucket counts do not yet meet the gate, and the reason is upstream of the
+model.** R14 and R15 returned zero recommendations; R16 returned three, all
+queued, none dropped or malformed — **3 Novel, 0 Wrong**. Full findings in
+`Docs/backtest/README.md`. Three defects in what the bundle carries account for
+the empty replies, and all three are in this plan's own units, not in the
+answering side:
+
+1. **U4.** `logs_section` passes `cal=None`, which sends `boost_cal` and
+   `boost_p0234` to SKIPPED *and* makes `compute_coverage` skip every table. Its
+   stated rationale (the session buffer is not the flashed bin) does not hold
+   for the case the courier is built for — the bundle's own prompt is "I flashed
+   this calibration and drove it". The session should be able to say so.
+2. **U8/U4 mismatch.** `advice-answering-guide.md` documents a `coverage`
+   section and instructs the answerer to use it. No bundle contains one:
+   `logs_section` never calls `compute_coverage` and never passes `extra=` to
+   `findings_to_dict`. This is what the R15 answer ran into after correctly
+   naming the exact table Sam edited.
+3. **Outside this plan.** `simoscal.analysis`'s `boost` check is overshoot-only;
+   there is no shortfall check. R15's whole premise was a boost *shortfall*, so
+   its motivating evidence is absent from the bundle by construction.
+
+Also recorded: the bundle names neither the active switch-patch slot (both R14
+and R15 reconstructed it numerically to eight significant figures) nor which of
+the nine cam-position ignition maps is live (R16's stated reason for leaving
+timing alone — where the lineage's own answer is "edit all nine").
+
+Not done: the plan's fixture-driven regression test on a captured known-good
+reply. R16's reply is now a real candidate for that fixture, but `simoscal` is
+public and the decision to put calibration values in its test data is Sam's.
+Back-test artifacts are gitignored in this repo for the same reason — a bundle
+is the whole decoded calibration in the clear, and this remote is public.
 
 ---
 

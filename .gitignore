@@ -34,3 +34,18 @@ __pycache__/
 
 # Third-party tuning guides (source .docx) — kept locally, not redistributed
 Docs/*.docx
+
+# Back-test artifacts: reproducible via Docs/backtest/backtest.py, and a
+# bundle is the whole decoded calibration in the clear — this remote is public.
+Docs/backtest/*/bundle.json
+Docs/backtest/*/reply.json
+Docs/backtest/*/replay.json
+Docs/backtest/*/replay.md
+Docs/backtest/*/state.json
+Docs/backtest/*/answer_transcript.jsonl
+Docs/backtest/*/answer_command.txt
+Docs/backtest/*/answer_audit.txt
+Docs/backtest/__pycache__/
+
+# Session-local resume checkpoint, not project config.
+.claude/RESUME.md
