@@ -639,12 +639,31 @@ throwaway directory outside the repo with no `CLAUDE.md`, no auto-memory and no
 lineage, and `replay` audits the transcript for any path outside the sandbox.
 Every audit so far is clean.
 
-**The bucket counts do not yet meet the gate, and the reason is upstream of the
-model.** R14 and R15 returned zero recommendations; R16 returned three, all
-queued, none dropped or malformed — **3 Novel, 0 Wrong**. Full findings in
-`Docs/backtest/README.md`. Three defects in what the bundle carries account for
-the empty replies, and all three are in this plan's own units, not in the
-answering side:
+**All four cases are answered and replayed: 4 recommendations, 4 queued, 0
+dropped, 0 malformed — 4 Novel, 0 Agrees, 0 Wrong.** Every record carried a
+gradeable prediction (G6). Full findings in `Docs/backtest/README.md`.
+
+The gate is **under-powered rather than met or failed.** Zero Agrees is not four
+disagreements: R14's actual change was not log-derived so no answerer could have
+reached it, R15 returned nothing because its motivating evidence is filtered out
+of the bundle, and R16's actual change was itself removed in R17. Only **R10** is
+a genuine head-to-head — and there both parties identified `IP_PQ_CHA_MAX` —
+Maximum allowed pressure quotient at turbo charger compressor as the binding
+constraint, read it identically (a flat 2.80 against a logged 2.893), and went
+opposite ways: Sam raised the ceiling, Claude lowered the request. The answering
+side even found the code-128 limiter independently and declined to act on it. The
+difference is that **the bundle carries no statement of the tuner's goal**, so the
+default is "bring the car inside its declared limits" — the inverse of the
+lineage's purpose. Q3 and Q4 are untouched by this; a new open question is.
+
+A better-characterised result than the bucket counts: three of four sessions
+independently converged on the *same* lambda edit (`IP_LAMB_BAS[1]` at 3008 rpm,
+values within 0.005 of each other), and split on whether one lean sample at 98 %
+HPFP justifies spending a flash. The analysis is reproducible; the sufficiency
+threshold is not stated anywhere and should be.
+
+Three defects in what the bundle carries account for the two empty replies, and
+all three are in this plan's own units, not in the answering side:
 
 1. **U4.** `logs_section` passes `cal=None`, which sends `boost_cal` and
    `boost_p0234` to SKIPPED *and* makes `compute_coverage` skip every table. Its
@@ -706,6 +725,8 @@ is the whole decoded calibration in the clear, and this remote is public.
 | Q3 | Should the bundle redact provenance detail (box code) before leaving the device? Plan assumes **no redaction** — the person is choosing to send it. | Non-blocking; U4 |
 | Q4 | Does a rejected recommendation's reason get recorded anywhere durable, for improving the answering side? Plan records it in UI state only. | Non-blocking; U7 |
 | Q5 | Should the answering side **refuse** a bundle whose profile it has no back-tested guidance for, or answer with a stated caveat? Refusing is safer; caveating keeps a second car usable at all. Plan assumes **caveat**, since U5's guards are the real gate and U8 only ever covers SC8S50. | Non-blocking; U8 |
+| Q6 | **Raised by U8's R10 result (2026-08-27).** Must a bundle carry the tuner's *goal*? With none stated, the answering side defaults to bringing the car back inside its declared limits, which on R10 was the exact inverse of what the revision was for. Two candidate answers: prompt for it in the app's note field, or state the default in the answering guide so a reader knows what they are getting. | Non-blocking; would change stage-2 scope |
+| Q7 | **Raised by U8 (2026-08-27).** Where is the line at which evidence justifies a flash? R10, R14 and R16 reached the same lambda cells from the same lean signature and split on whether to act. The guide blesses the empty answer and forbids low-confidence changes but never states the threshold between them. | Non-blocking; U8 follow-up |
 
 ## Risks
 

@@ -1,7 +1,7 @@
 ---
 date: 2026-08-27
 type: backtest
-status: in progress — R16 pending, R10 not yet answered
+status: all four cases answered and replayed
 plan: "[[2026-08-24-001-feat-tune-with-claude-courier-plan]]"
 scope: SC8S50 only
 ---
@@ -27,23 +27,61 @@ far report **no tool call named a path outside the sandbox**.
 
 | Revision | Recommendations | Agrees | Refused | Novel | Wrong | Case quality |
 |----------|-----------------|--------|---------|-------|-------|--------------|
+| R10      | 1               | 0      | 0       | **1** | 0     | **strong** — torque-limiter driven, and the battery has that check |
 | R14      | 0               | 0      | 0       | 0     | 0     | weak — the actual change was not log-derived |
 | R15      | 0               | 0      | 0       | 0     | 0     | **strong** — a log-driven change with its own logs in the bundle |
-| R16      | *pending*       | —      | —       | —     | —     | fair — the actual change was later superseded unflashed |
-| R10      | *not answered*  | —      | —       | —     | —     | **strong** — torque-limiter driven, and the battery has that check |
-| **Total**| **0 so far**    | **0**  | **0**   | **0** | **0** | |
+| R16      | 3               | 0      | 0       | **3** | 0     | fair — the actual change was later superseded unflashed |
+| **Total**| **4**           | **0**  | **0**   | **4** | **0** | |
 
-> [!important] The **Wrong** bucket is empty, and that is not yet a result
-> Nothing has been recommended at all, so nothing could land in **Wrong**. An
-> empty Wrong bucket earned by an empty Agrees bucket is not evidence that the
-> answering side is safe — it is evidence that the courier is not yet producing
-> recommendations to judge. The gate is not met, and it is not failed either.
+Of the four recommendations, **all four passed the guards** — nothing was
+dropped, nothing was malformed, and no journal entry was ever written by a
+review. Every record carried a gradeable prediction (G6).
 
-## Why every reply so far is empty
+> [!important] The **Agrees** bucket is empty, and the **Wrong** bucket is too
+> Zero Agrees is not four disagreements. R14's actual change was not log-derived
+> at all, so no answerer could have reached it; R15 returned nothing because its
+> motivating evidence is filtered out of the bundle (below); R16's actual change
+> was later judged wrong by Sam and removed in R17. Only R10 is a genuine
+> head-to-head, and there the two reached the **same constraint and opposite
+> conclusions** for a reason the bundle does not carry.
+>
+> Zero Wrong is real but thin: four records is a small sample, and the plan is
+> right that an enumerated Wrong bucket is what gates stage 2. **The gate is not
+> met and not failed.** It is under-powered, and the reason it is under-powered
+> is fixable.
 
-Not model reticence. Each reply is a 7,000-character `summary` of correct,
-checkable reasoning that stops one step short of an edit, and in each case the
-step it stops at is the same one. Three symptoms, one root cause.
+## The single most important case: R10
+
+Sam and the answering side both identified `IP_PQ_CHA_MAX` — Maximum allowed
+pressure quotient at turbo charger compressor as the binding constraint, both
+read it correctly (a flat 2.80, against a logged 2.893), and then went opposite
+ways: Sam **raised the ceiling** to 3.1 to clear a code-128 torque-limiter cap;
+Claude **lowered the request** to 2715 hPa to come back inside the declared
+ceiling.
+
+The answering side even found the limiter independently — *"the torque-limiter
+finding shows source code 128 active for 385 samples with timing at −10.9 deg"* —
+and declined to act on it, on the grounds that the boost target was not the
+binding quantity. Detection was not the gap. The gap is the step from *"a limiter
+is capping this"* to *"and here is the table that raises the limiter."*
+
+> [!important] The bundle carries no statement of the tuner's goal
+> Absent one, the answering side defaults to bringing the car back inside its own
+> declared limits — here, the inverse of the lineage's purpose. Partly a rig
+> artifact: `backtest.py` uses a deliberately neutral prompt, because a
+> per-revision prompt would be *"a prompt written knowing the answer."* In the
+> real app the person writes their own note. What R10 proves is that the goal is
+> **load-bearing**, not that the answering side is wrong.
+
+Full detail in [[Docs/backtest/R10/comparison|R10/comparison.md]].
+
+## Why R14 and R15 returned nothing
+
+Not model reticence — R10 and R16 both produced sized, guard-passing edits from
+the same rig, so the capability is not in question. Each empty reply is instead a
+7,000-character `summary` of correct, checkable reasoning that stops one step
+short of an edit, and the step it stops at is the same one each time. Three
+symptoms, one root cause.
 
 ```mermaid
 flowchart TD
@@ -111,6 +149,29 @@ present but unreported: the `wastegate` check's evidence carries
 own docstring already knows what that means (*"WG hit 100% only while under
 setpoint during spool"*). The number reaches the bundle; the finding does not.
 
+## The reproducibility result
+
+Three of the four sessions converged on the same lambda edit, independently and
+blind:
+
+| Session | Table and cells | Values | Outcome |
+|---------|-----------------|--------|---------|
+| R10 | `IP_LAMB_BAS[1]` @ 3008 rpm, rows 1100/1200/1389 mg/stk | 0.975 / 0.955 / 0.925 | written out in `summary`, then **declined** |
+| R14 | same signature (+0.049 lean at 3081 rpm) | — | **declined** |
+| R16 | `IP_LAMB_BAS[1]` @ 3008 rpm, rows 900/1100/1200/1389 | 0.97 / 0.95 / 0.93 / 0.90 | **recommended**, queued |
+
+Same table, same column, near-identical values, from three sessions that could
+not see each other. The *analysis* is highly reproducible; the *risk threshold*
+is not — R10 and R14 refused on the grounds that a measured-versus-commanded
+lean error at 98 % HPFP may be delivery rather than setpoint, which is the
+guide's own "symptom's table rather than the cause's" anti-pattern; R16 checked
+pump headroom, judged it sufficient, and acted.
+
+That variance is more useful than the bucket counts. It says the answering side
+agrees on *what the logs mean* and disagrees on *when evidence is sufficient to
+spend a flash* — which is a threshold the guide could state explicitly and
+currently does not.
+
 ## What the answers got right
 
 Worth recording, because it is the part that no guard supplies and the part
@@ -153,8 +214,29 @@ In the order that would most change the bucket counts:
    section that cannot be produced is worse than not having it.
 4. **Re-run all four cases** once 1–3 land. Only then are the bucket counts
    evidence about the answering side rather than about the bundle.
-5. **Carry the active switch-patch slot in the bundle**, since two independent
-   sessions had to reconstruct it numerically to say anything about boost.
+5. **Carry the active switch-patch slot in the bundle.** Three independent
+   sessions reconstructed it numerically — matching peak PUT minus logged
+   overshoot to eight significant figures — before they could say anything about
+   boost. R10 went further and proved the session had *mixed* slots, splitting
+   its pulls into two incomparable groups; the battery never reported that.
+6. **Say in the bundle which of the identical variant grids is live**, or say
+   that the convention is to move all of them together. Two cases stalled on it:
+   R10 refused a lambda edit because *"an edit to one is a one-in-three chance of
+   editing the grid that is actually in force"*, and R16 left timing alone
+   because it *"cannot tell from the bundle which of the nine cam-position
+   ignition tables was active."* The lineage's own answer in both cases is
+   *move them all* — which R16's actual revision did across all nine maps.
+7. **Carry the tuner's goal.** R10 is the whole argument: a sound analysis
+   produced advice pointing away from the lineage's intent because nothing said
+   the intent was more power on upgraded hardware. In the app this is the
+   person's own note, so the fix may be prompting for it rather than adding a
+   field — but the answering guide should say that an absent goal means
+   *bring the car inside its declared limits*, so a reader knows what default
+   they are getting.
+8. **State a sufficiency threshold in the answering guide.** R10, R14 and R16
+   reached the same lambda cells and split on whether one lean sample at 98 %
+   HPFP justifies acting. The guide blesses the empty answer and warns against
+   low-confidence changes, but never says where the line is.
 
 ## Reproducing
 
