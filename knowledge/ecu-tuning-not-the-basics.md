@@ -177,7 +177,33 @@ I believe this should be pretty straight forward, but it should be pointed out t
 
 Ahhh, knock. First there is knock detection, AKA sensitivity of the knock sensors. Then there is the knock correction factor, AKA how much timing to pull during a knock event. Lastly, there is how quickly should the timing pull be decayed to get back to the standard timing. Ever the argument, how much knock is ok?
 
-On the current SC8S50 XDF, the directly relevant identified calibrations include `IP_IGA_DEC_KNK` — Spark retard at recognised knocking, `IP_IGA_INC_KNK` — Increasing value of knock integrated correction when knock is detected, and `IP_KNKS_GAIN_PRE[0..3]` — Gain value for each cylinder for the knock pre-window. Confirm that each screenshot’s axes and live values match before associating it with one of these symbols.
+> [!note] Screenshot-to-symbol mapping — **confirmed 2026-08-27**
+> Each screenshot below was matched to an SC8S50 symbol by decoding the stock
+> bin `5G0906259L__0002.bin` and comparing axis breakpoints and every cell
+> value. All four are exact matches, so these associations are settled rather
+> than inferred from the titles:
+>
+> | Guide screenshot      | TunerPro name                         | Symbol                                                                                    | Shape / axes                        | Stock values                 |
+> | --------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------- |
+> | `image30` / `image56` | Initial Knock Correction              | `IP_IGA_DEC_KNK` — Spark retard at recognised knocking                                    | 4x8, rpm x airmass                  | −1.50 to −3.00 °CRK          |
+> | `image79` / `image84` | Cyl Strokes Between Knock Decay Steps | `IP_DLY_INC_FAST_KNK` — number of segments between each increase of fast loop             | 1x8, rpm                            | 2, 5, 7, 9, 16, 21, 27, 33   |
+> | `image9`              | Knock Correction Decay Amount         | `IP_IGA_INC_KNK` — Increasing value of knock integrated correction when knock is detected | 4x8, rpm x current correction       | 0.375 °CRK (0.75 at 736 rpm) |
+> | `image32`             | cylinder sensitivity                  | `IP_KNKS_GAIN_PRE[0..3]` — Gain value for each cylinder for the knock pre-window          | one 4x8 per cylinder, rpm x airmass | —                            |
+>
+> **Sign convention, and why the titles mislead.** The knock correction is a
+> negative number, and *increasing* it moves it back toward zero. So
+> `IP_IGA_INC_KNK`, whose XDF title reads "Increasing value of knock integrated
+> correction when knock is detected", is the **recovery amount per step** —
+> which is why TunerPro names the same table "Knock Correction Decay Amount".
+> Do not read "increase" as "pull more timing".
+>
+> Related symbols that are *not* what the guide describes, and are easy to grab
+> by mistake: `IP_FAC_IGA_DEC_KNK` — Knock Factor Table Cyl. X is indexed by
+> rpm x **knock energy**, not airmass; `IP_IGA_AD_1_INC_KNK`,
+> `IP_IGA_AD_1_DEC_KNK` and `IP_DLY_INC_AD_1_KNK` drive the slow adaptive (ad1)
+> loop rather than the fast loop that handles a single WOT knock event; and
+> `IP_IGA_MAX_KNK` — Maximum value for spark retard is the −13.9 to −19.1 °CRK
+> backstop on total retard, untouched by any of the changes below.
 
 Here are your cylinder sensitivity tables. I’d just suggest leaving them alone; let the knock sensors do their job.
 

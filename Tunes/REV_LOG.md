@@ -1427,3 +1427,274 @@ terms rather than assuming the pocket correction covers it.
 
 Still **revision 18 — a starting point, not a finished calibration**. The script
 and build pipeline never flash an ECU.
+
+---
+
+## R19 — knock fast-loop recovery and a sized wastegate close
+
+**⚠ CAL flash eligible after R07 patch installation.** R19 retains R07's
+CBRICK, HSL, and switch-patch 29.33 ASW/code components byte-identically and
+moves calibration bytes only. Flashing and the final review gate remain human
+steps.
+
+R19 is the first revision in this lineage to touch knock control, and it changes
+two domains rather than one. That is a deliberate departure from the
+one-domain-at-a-time rule, taken on the human's direction: the two changes act
+through independent ECU paths — the knock fast loop and the boost feedforward —
+and the R18 logs support both independently, so a next-session log can attribute
+a knock-recovery change from a boost-tracking change without ambiguity. Base
+timing is not stacked in; all nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0
+port-flap-low maps are byte-identical to R18.
+
+### Knock — all three tuning-guide fast-loop tables
+
+The screenshot-to-symbol mapping was confirmed cell-by-cell against the stock
+bin on 2026-08-27 and is recorded in
+`knowledge/ecu-tuning-not-the-basics.md` § Knock behavior and calibration. It is
+independently corroborated by `SCGa05_cal.xdf`, which titles the same three
+symbols with the guide's own names.
+
+| Table                                                                                     | Stock                      | R19                        |
+| ----------------------------------------------------------------------------------------- | -------------------------- | -------------------------- |
+| `IP_IGA_DEC_KNK` — Spark retard at recognised knocking                                    | −1.50 to −3.00 °CRK        | −0.75 to −1.50 °CRK        |
+| `IP_DLY_INC_FAST_KNK` — number of segments between each increase of fast loop             | 2, 5, 7, 9, 16, 21, 27, 33 | 2, 5, 7, 9, 12, 15, 18, 21 |
+| `IP_IGA_INC_KNK` — Increasing value of knock integrated correction when knock is detected | 0.375 °CRK (0.75 at 736)   | 0.750 °CRK everywhere      |
+
+The sign convention is the trap and the script guards against it. The knock
+correction is a **negative** angle, so *increasing* it moves back toward zero:
+`IP_IGA_INC_KNK` is the recovery step size, which is why TunerPro names the same
+table "Knock Correction Decay Amount". Reading "increase" as "pull more timing"
+inverts the edit.
+
+The last two tables are the recovery change the R18 review's gate called for, and
+together they are roughly a 2.5× faster recovery in R18's knock zone. The
+evidence is that R18 does not knock *often* — two events over 21 band-covering
+segments in matched air — but carries each cut a long way: six of ten events
+across the three logged sessions were still recovering in 4th gear, and the cool
+session's single event never cleared before the pull ended.
+
+`IP_IGA_DEC_KNK` is the one change `Tunes/README_NEXT_STEPS.md` § R19 candidate
+explicitly held back, and it is included here on the human's direction. That
+section's reasoning was written while sensor saturation was still untested, and
+its argument has to be read against what the R18 logs then measured: knock
+threshold peaks 2.68–3.46 V against the 4.004 V `C_KNKS_THD_MAX` clamp and noise
+level never exceeds 1.53 V, so **the events are real threshold crossings, not
+ghost knock**. Halving the initial cut therefore does reduce the ECU's response
+to genuine detonation — that is the honest statement of the trade, and it is the
+thing the next logs must be read against. What bounds it:
+
+- `IP_IGA_MAX_KNK` — Maximum value for spark retard is untouched at −13.9 to
+  −19.1 °CRK, so the backstop on *total accumulated* retard is unchanged. A
+  cylinder that keeps knocking still integrates down to the same floor; it now
+  takes more events to get there.
+- `IP_KNKS_GAIN_PRE[0..3]` — Gain value for each cylinder for the knock
+  pre-window is untouched, so detection sensitivity is unchanged. This revision
+  does not quiet the sensors, which is the failure mode the guide warns about.
+- The three settled single-cylinder −3.0° events R18 logged decayed
+  monotonically with no co-cylinder involvement. R19 makes each such event cost
+  about −1.50 °CRK instead, on an engine whose knock protection is otherwise
+  intact.
+
+### Wastegate — an axis re-breakpoint, then two cells closed toward stock
+
+`IP_FAC_BPA_SP[0]` / `[1]` — Map for boost pressure actuator setpoint
+under-commands from 5000 rpm up. Across three sessions and both thermal
+conditions the closed loop carries 8.6–12.1 % integral to hold a 4.3–7.3 kPa
+shortfall. This is a pre-R18 carry-over, not an R18 effect.
+
+**The first attempt at this was cell values alone, and it was barely worth
+shipping.** Bounded at the factory value, it recovered about 0.3 psi of a
+0.6–1.1 psi shortfall, because the one cell that discriminates the shortfall
+band from redline hit its stock cap immediately. The limit was geometry, not
+cell values — so R19 fixes the geometry first.
+
+#### The re-breakpoint
+
+`ldp_fac_2_ip_fac_bpa_sp` — the intake-flow-factor y axis of both feedforward
+maps — carried breakpoints at 1.25 and 1.50. Nothing in 2537 logged 3rd-gear
+WOT samples exceeds **1.201**, so both rows sat entirely above the operating
+envelope while the 5000–6000 rpm shortfall (median intake 1.06–1.10) and
+redline (median 1.00) were left sharing the cells on rows 0.90 and 1.05.
+
+R19 moves breakpoint 8 from **1.25 to 1.15** and resamples both maps onto it.
+That gives the shortfall band a cell of its own:
+
+| Band       | cell (1.15 × 1.40) weight before | after |
+| ---------- | -------------------------------- | ----- |
+| 5000–5500  | 0.201                            | 0.384 |
+| 5500–6000  | 0.201                            | 0.380 |
+| 6000–6600  | 0.033                            | 0.066 |
+
+Three things make this a safe edit rather than the riskiest class of change:
+
+- **Blast radius is two tables.** That axis breakpoints `IP_FAC_BPA_SP[0]` and
+  `[1]` and nothing else in the XDF — checked, not assumed. Contrast
+  `ldpm_n_32_5_igsp`, which breakpoints ten IGA correction tables.
+- **The move is a verified no-op at WOT.** `move_intake_flow_breakpoint`
+  resamples both maps as it moves the breakpoint, and the script replays the
+  ECU's own bilinear lookup over all 2537 logged operating points before and
+  after. Worst commanded-position change: **0.0027 points**, below half the
+  table's 6.1 × 10⁻⁵ encoding step. Cells are only edited after that assertion
+  passes, so any WOT boost behaviour change in the next log is attributable to
+  the cell deltas alone.
+
+  **Scope, and an open finding against it.** Those 2537 points are the WOT
+  subset — ≥90 % pedal, actual 3rd gear, ≥3000 rpm. Replaying the axis move over
+  *every* logged flow-factor row instead finds 34 samples whose modelled
+  feedforward moves by more than 0.1 points and 28 by more than 1 point, worst
+  −6.079 at 6557 rpm / 53 % pedal / intake flow factor 1.515. So the claim that
+  the top rows sit above the operating envelope holds at WOT and not at part
+  throttle, and the transient behaviour of this map is changed in a way this
+  revision has not reviewed. **`Tunes/MainTune/tune_code_review.md` P1 is open
+  against exactly this, and R19 is not flash-reviewable until it is resolved** —
+  by preserving the whole reachable envelope, dropping the axis move, or showing
+  those states do not consume this map.
+- **The trade is stated, not hidden.** The surface is preserved exactly only up
+  to intake flow factor 1.21; above that the top rows are extrapolated along the
+  same slope. That spends the axis's top-end reserve, which is sound only
+  because this engine cannot reach there. **If the turbo is ever changed, this
+  region must be recalibrated before it is trusted.**
+
+#### The cells
+
+Deltas re-solved on the new geometry by
+`Logs/BasicsGuide_R18/size_r19_wastegate.py` — the same bounded least squares
+that sized R15, run in the closing direction. The model is validated before it
+is used: replaying the lookup against the logs reproduces `WG Pos Base (%)` to
+**0.066 points RMS**.
+
+| Cell (Int × Exh) | R18 (resampled) | delta  | R19   | stock at that intake |
+| ---------------- | --------------- | ------ | ----- | -------------------- |
+| 0.90 × 1.00      | 0.675           | +0.010 | 0.685 | 0.735                |
+| 1.15 × 1.40      | 0.525           | +0.066 | 0.591 | 0.625                |
+
+Guardrails, unchanged from the first attempt except that the stock cap is now
+read off the stock *surface* at the cell's new breakpoint rather than off the
+stock cell that used to sit at that index:
+
+- **Never more closed than stock**, asserted against the stock bin.
+- **4500–5000 rpm is held, not fixed** — it under-delivers 3.9 kPa, but HPFP
+  effective volume already peaks at 95.9 % there, so it has no fuel headroom to
+  accept more airmass.
+- **6000–6500 rpm is held** — it already runs +1.7 kPa *over* target.
+
+Delivered effect, replayed from the saved R19 bin over the logged points:
+
+| Band       | R18   | R19 predicted |
+| ---------- | ----- | ------------- |
+| 4000–4500  | −2.8  | −2.3          |
+| 4500–5000  | −3.9  | −3.2          |
+| 5000–5500  | −7.3  | **−3.8**      |
+| 5500–6000  | −4.3  | **−0.8**      |
+| 6000–6600  | +1.7  | +2.4          |
+
+#### What R19 does NOT fix
+
+**The redline over-delivery.** 6000–6500 rpm runs +1.7 kPa over target and R19
+leaves it slightly worse at +2.4. Both deltas are close-only; nothing in this
+revision removes boost anywhere.
+
+This is not an oversight, it is the same geometry problem one row lower. Redline
+(median intake 1.002) and the 4000–4500 rpm band (median 0.921) both sit between
+the 0.90 and 1.05 breakpoints, and 4000–4500 is itself 2.8 kPa *short*. So every
+cell that could trim redline also re-opens an underboost a band lower.
+Separating them needs a breakpoint near 0.96, and this ten-row axis has no spare
+row down there — everything from 0 to 0.75 is live at spool and part throttle.
+
+In context it is a tracking error, not a safety event: +1.7 kPa mean and
++8.9 kPa worst sample against a 237 kPa setpoint, peak absolute PUT 254.7 kPa,
+against an `IP_PUT_AMP_DIF_MAX_PRS_DIF_THR` — Overboost pressure-difference
+threshold of 2700 hPa. The underboost traded against it is four times larger.
+See `README_NEXT_STEPS.md` § R20.
+
+The boost setpoint is not touched anywhere in R19. This moves work from the
+integral to the feedforward at a target the closed loop already commands.
+
+### Verification (authoritative run `R19_20260829-072607`)
+
+- Output: `Tunes/MainTune/MainTune_out/R19_20260829-072607/Patched_259L_R19.bin`.
+  SHA-256:
+  `70d4da677f2f623bb6293ae9cb3f90873a16fd3b7dc199d5ff78b844db2047f5`.
+- R18 byte-audit reference SHA-256:
+  `b3bf96a47e0c6ab704401c09e36939b24eebdd76472ae080f9fd435205cb9bfd`.
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`), verified independently after save;
+  final-bin readback **PASS** for all 143 touched tables.
+- Raw-diff audit vs R18 **CLEAN** — 152 changed bytes, all attributed;
+  unexplained = 0. Attributed by hand as well: 32 `IP_IGA_DEC_KNK` cells, 4
+  `IP_DLY_INC_FAST_KNK` cells, 30 `IP_IGA_INC_KNK` cells, 40 bytes in each
+  `IP_FAC_BPA_SP` map (the resampled rows plus the two cell deltas), 2 bytes of
+  `ldp_fac_2_ip_fac_bpa_sp`, and the 4 stored `CAL_CRC` bytes at `0x200304`.
+- Independent XDF decode read all 3814 tables with zero errors and found exactly
+  **six** changed calibration tables: the three knock tables, the two wastegate
+  maps, and their shared intake-flow-factor axis. Every other decoded table —
+  including all nine base ignition grids and `IP_IGA_MAX_KNK` — is
+  byte-identical to R18.
+- The intake-axis re-breakpoint was asserted a no-op over all 2537 logged
+  operating points *before* any cell was edited: worst commanded-position change
+  0.0027 points, against a tolerance of half an encoding step.
+- Script guards that must hold for the build to finish: all three knock tables
+  read exactly stock going in; every declared knock angle is a whole multiple of
+  the 0.375 °CRK encoding step; the retard grid is strictly shallower than stock
+  in every cell, the delay never longer, the recovery step never smaller; the
+  intake breakpoint being moved still reads its inherited 1.25 going in; the
+  re-breakpoint is a no-op over the logged points; and each wastegate cell's
+  declared stock cap is checked against the stock surface at the cell's new
+  intake breakpoint.
+- The untouched recovery image retained SHA-256
+  `d61a6e297b3ac1d25f60ec8cb3bb504ff47f2db603a960a56e6a6e34074ad69b`.
+- The earlier `R19_20260828-172224` run is superseded. Its bin is byte-identical
+  — same SHA-256 — but its `report.md` narrates the abandoned three-cell,
+  no-re-breakpoint version of the wastegate edit, which is not what the script
+  applies. Only the run above is eligible for human review.
+
+### Human review and logging gate
+
+> **This gate does not pass yet.** `Tunes/MainTune/tune_code_review.md` P1 is
+> open against the intake-axis re-breakpoint: it is proven a no-op only over the
+> 3rd-gear WOT subset, and replaying it over every logged flow-factor row shows
+> part-throttle and lift states whose modelled feedforward moves by up to 6
+> actuator-position points. Resolve that before flashing R19. Everything below
+> is the gate as it will stand once it is resolved.
+
+Review the R18→R19 comparison plots for the three knock tables and both
+`IP_FAC_BPA_SP` maps. **The nine base ignition grids must show no change at
+all** — that is the check that R19 did not quietly stack a timing change onto a
+knock change.
+
+Validate with normal full actual-3rd-gear WOT pulls to redline on slot 4 and
+92-octane fuel, **in cool air**, and **hold WOT into 4th after the upshift** —
+the carry into the next gear is the specific thing this revision is trying to
+shorten, and it is only measurable if 4th is logged. Keep the per-cylinder
+knock-sensor channels in the logging list.
+
+The measurements that decide whether R19 worked:
+
+1. **Recovery carry** — time from knock onset to full zero, and whether the cut
+   still spans an upshift. Success is a shorter carry.
+2. **Cut depth** — a single event should now cost about −1.50 °CRK instead of
+   −3.00. That is the intended change, not a fault.
+3. **Event rate and character** — this is the one to watch hardest, because a
+   shallower cut plus faster recovery returns the engine to the knock boundary
+   sooner and more often. A rise in event *rate* at unchanged character is the
+   expected cost and is readable; a change in *character* is not.
+4. **Boost tracking at 5000–6000 rpm** — PUT error should improve by about
+   3.5 kPa at 5000–5500 and 3.5 kPa at 5500–6000, with `WG I Value` falling by
+   roughly the amount the feedforward gained (about 2.5 points). **If PUT error
+   and integral both stay put, the command is not reaching the flap** and the
+   remaining shortfall is mechanical, not calibration — that is the one outcome
+   this revision is designed to distinguish.
+5. **Redline over-delivery** — expected to go from +1.7 to about +2.4 kPa. That
+   is predicted, not a regression. Anything materially beyond it means the
+   re-breakpoint behaved differently in the car than in the replay.
+
+Stop/rollback signals are unchanged and are all about character, not depth:
+simultaneous multi-cylinder retard, retard that ramps instead of decaying, total
+accumulated retard approaching the untouched `IP_IGA_MAX_KNK` floor, loss of
+lambda or fuel-pressure control, or protection-limited timing delivery. Any of
+those is a stop signal. Given that this revision reduces the initial protective
+cut on events already shown to be real, treat the first R19 session as a
+higher-attention log than R18's, not a routine one.
+
+Still **revision 19 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.
