@@ -304,3 +304,61 @@ revision and this is consistent with "no power lost, boost slightly better held.
 
 R19 is **validated on its own terms and worth keeping.** It remains
 **revision 19 — a starting point, not a finished calibration.**
+
+---
+
+## Addendum (2026-08-30) — which base ignition map the ECU is actually on at WOT
+
+Asked for by the R20 plan, whose per-slot `Spark modifier` guard caps
+**delivered** timing (base + modifier) and so needs the operative base map. Run
+`find_operative_ign_map.py` in this folder to reproduce everything below.
+
+**Answer: `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle map,
+low port-flap position, standard valve lift** (`ignition_base_vvl0_i*_e*` in the
+`SC8S50` profile; `[0][0]` is uniqueid `0x426ec`). The cam-node index does not
+matter — see below.
+
+Three of the four family axes are settled without fitting anything:
+
+| Axis            | How it is settled                     | WOT value                       |
+|-----------------|---------------------------------------|---------------------------------|
+| Port flap H/L   | `Port Flap Pos (%)` logged channel    | **0.00%** in 1795 of 1795 → `PORT_L` |
+| Valve lift      | `Valve Lift Pos ()` logged channel    | **0** in 1733 of 1795 (96.5%) → `STND` |
+| Cam nodes `[i][e]` | direct comparison of the nine grids | **all nine byte-identical**     |
+
+The cam-node result is the useful one. The ECU interpolates *between* the nine
+cam-phasing maps rather than selecting one, so the honest answer could have been
+a blend of several — but on this bin all nine are the same grid, so intake and
+exhaust cam position cannot change delivered base timing at all. The guard needs
+no cam state.
+
+**The fit confirms it.** Simulating the ECU's bilinear lookup on that map at
+each WOT sample's (rpm, airmass) reproduces the logged `Ign Table` channel to
+**mean −0.007°, rms 0.184°, p95 |error| 0.186°** over 1733 standard-lift
+samples. By rpm band above 1150 mg/stk the agreement is within 0.01° almost
+everywhere:
+
+| rpm band  | n   | logged | map lookup | diff   |
+|-----------|-----|--------|------------|--------|
+| 2900–3200 | 33  | −6.73  | −6.97      | +0.246 |
+| 3400–3700 | 89  | −6.48  | −6.49      | +0.012 |
+| 3900–4200 | 104 | −4.49  | −4.48      | −0.009 |
+| 4400–4700 | 236 | −3.57  | −3.57      | +0.001 |
+| 4900–5200 | 183 | −1.90  | −1.91      | +0.006 |
+| 5400–5700 | 201 | +0.80  | +0.80      | −0.001 |
+| 5900–6200 | 206 | +2.01  | +2.01      | +0.008 |
+| 6300–6700 | 33  | +3.17  | +3.10      | +0.066 |
+
+The 62 `LFT_1` samples are the control: scored against the same `STND` map they
+miss by **−3.05° mean, 3.50° rms**. A wrong map in this family does not fit, so
+the standard-lift agreement is not an artifact of a flat map or a loose metric.
+
+Two consequences for R20:
+
+- The map's **1400 mg/stk row reads −7.50, −6.75, −4.50, −3.75, −2.25, +0.75,
+  +1.88, +3.38 °CRK across 3000–6500 rpm**, which is exactly the slot-4
+  delivered row the R20 brainstorm and plan assumed. That assumption is now
+  measured rather than carried.
+- `Ign Table` is the **base-table output**, not final commanded timing — that is
+  why it matches a pure table lookup with no knock or temperature term. It stays
+  the right channel for confirming a `Spark modifier` offset landed.

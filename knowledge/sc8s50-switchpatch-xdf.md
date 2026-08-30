@@ -107,6 +107,74 @@ Caveats:
   descriptions. The exact runtime interplay of `Enable SL TC` vs
   `Disable OEM TC` is **not verified** — needs testing or upstream docs.
 
+## Per-slot `Spark modifier` — semantics (R20 plan U1, 2026-08-30)
+
+`Spark modifier` is a per-slot **16x16 additive ignition-angle offset**, in
+degrees CRK, laid on the *same grid as the shared base ignition maps*. Five
+copies exist, one per map slot, at a `0x100` stride:
+
+| Slot | XDF uniqueid / address | Category |
+|------|------------------------|----------|
+| 1    | `0x7CF1A`              | Map Slot 1 |
+| 2    | `0x7D01A`              | Map Slot 2 |
+| 3    | `0x7D11A`              | Map Slot 3 |
+| 4    | `0x7D21A`              | Map Slot 4 |
+| 5    | `0x7D31A`              | Map Slot 5 |
+
+Slot attribution is from each table's third `CATEGORYMEM` (`category="248"`
+down to `"244"`, i.e. `CATEGORY` indices `0xF7`..`0xF3` = Map Slot 1..5), not
+from address order alone. File offset in the bin = `0x200000 +` address.
+
+### Evidence that it is additive
+
+1. **It reuses the base ignition maps' own axis objects, byte for byte.**
+   X = `0x3CE5A` (`ldpm_n_ip_iga_bas_igsp`, rpm, identity scaling, 400 -> 6500);
+   Y = `0x3CDBC` (`ldpm_maf_ip_iga_bas_igsp`, mg/stk, `/23.59071274298056`,
+   80 -> 1400). These are the exact axes of
+   `IP_IGA_BAS_IVVT_VVL_PORT_[HL][STND][i][e]` -- Basic ignition angle maps in
+   `Code/xdf/SC8S50.V1.0.xdf`. Not a similar grid: the same two axis tables.
+2. **It reuses the base map's codec and declared range verbatim** --
+   `(raw - 95) / 2.6666667`, i.e. `0.375 * raw - 35.625`, units `degree`,
+   min `-35.625`, max `60.0`. The patch author copied the base map's z-axis.
+3. **All five slots ship neutral at decoded `0.00`, not raw `0`.** Verified on
+   `Patched_259L_R19.bin`: all 256 bytes of all five grids are `0x5F` = 95 =
+   `0.00` degrees. This is what rules the alternatives out. If the grid
+   *replaced* base timing, the everyday slot 4 would be commanding 0 degrees
+   everywhere and the car would not run as it does. If it were a *multiplier*,
+   neutral would have to be `1.0`, not `0.0`. Additive is the only reading
+   consistent with a car that drives normally on every slot.
+4. **A sibling table confirms the pattern.** The patch also defines
+   `0x7F2D0` -- "Modifier" under Flex Fuel > Spark, on the same two axes with
+   the same codec, gated by a per-slot `Enable flex fuel spark modifier` flag
+   (`0x7D7F4`/`0x7D7FA`/`0x7D800`/`0x7D806`/`0x7D80C`). An ethanol-content
+   spark modifier is additive by construction; it shares this one's shape.
+
+### What is NOT established: control-state scope
+
+Whether the addition is applied in **every** ignition control state or only a
+subset (e.g. not during catalyst heating, overrun, or a knock-limited state)
+**cannot be read off a neutral table** -- a grid that is never consulted also
+decodes `0.00`. Settling it from the patch itself would mean disassembling the
+7,236-byte TriCore code block the patch installs at file `0x131100`
+(`SL PATCH.29.33 - S50.btp`, 38 blocks; the 21 scattered 3-byte ASW edits are
+its hook sites) *and* identifying which stock function each hook sits in. That
+is not cheap, and no TriCore disassembler is installed here.
+
+The practical bound instead: **the cells themselves scope the risk.** A cell is
+only reachable at its own rpm and airmass. Writing non-zero only into the 1200
+and 1400 mg/stk rows above 3000 rpm means no control state below that load can
+see anything but `0.00`. An unknown scope therefore fails benign -- either the
+offset applies at WOT (intended) or it is a no-op.
+
+> [!note] Off-axis behaviour
+> WOT airmass reaches ~1600 mg/stk against a top Y breakpoint of 1400. For the
+> **modifier** this is moot as long as the 1200 and 1400 rows are written
+> identically: a flat segment has zero slope, so clamping and linear
+> extrapolation give the same answer above 1400. Note this does *not* hold for
+> the base maps themselves -- in `Patched_259L_R19.bin`,
+> `IP_IGA_BAS_IVVT_VVL_PORT_H[STND][0][0]` (`0x3DE8C`) has *different* 1200 and
+> 1400 rows.
+
 ## Which XDF loads under `simoscal` (BTP-adapter U1, 2026-07-10)
 
 Resolved offline while building the BTP patching adapter (see
