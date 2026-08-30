@@ -1650,6 +1650,13 @@ integral to the feedforward at a target the closed loop already commands.
 
 ### Human review and logging gate
 
+> **Recorded 2026-08-30: this gate was never closed, and R19 was flashed and
+> logged anyway.** The 2026-08-30 cool-air session is reviewed in
+> `Logs/BasicsGuide_R19/log_review.md`, which finds R19 met all five measurements
+> below and produced nothing dangerous — but that is a post-hoc result, not
+> retroactive approval, and P1 remains open and untested by that session.
+> The original blocking text follows, unchanged.
+
 > **This gate does not pass yet.** `Tunes/MainTune/tune_code_review.md` P1 is
 > open against the intake-axis re-breakpoint: it is proven a no-op only over the
 > 3rd-gear WOT subset, and replaying it over every logged flow-factor row shows
