@@ -1705,3 +1705,272 @@ higher-attention log than R18's, not a routine one.
 
 Still **revision 19 — a starting point, not a finished calibration**. The script
 and build pipeline never flash an ECU.
+
+---
+
+## R20 — slot 5 becomes the octane-boosted timing map
+
+**⚠ CAL flash eligible after R07 patch installation.** R20 retains R07's CBRICK,
+HSL, and switch-patch 29.33 ASW/code components byte-identically and moves
+calibration bytes only. Flashing and the final review gate remain human steps.
+
+R20 changes **exactly two tables**, and both belong to **map slot 5 alone**. It
+is the first revision in this lineage whose validation is a *within-session A/B*
+rather than a comparison against the previous session, because for the first time
+two selectable maps differ from each other in one controlled variable.
+
+Everything else — every base ignition cell, R19's three knock fast-loop tables,
+the wastegate feedforward and its re-breakpointed intake axis, the exact Spark
+IAT tables, fueling, limiters, slots 1–4, and the patch set — is inherited from
+R19 byte for byte.
+
+### What changed, and why here
+
+**`Spark modifier` — map slot 5 ignition offset** (patch-added, no A2L symbol;
+uniqueid `0x7d31a`) gains 16 of its 256 cells.
+
+The problem this solves is structural. The nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle maps are
+**shared by all five slots**. There is exactly one base-timing calibration in
+the bin, so "more timing on a boosted tank, stock timing otherwise" cannot be
+expressed by editing them — that would move slot 4 too. The switch patch's
+per-slot `Spark modifier` grid is the only per-slot timing surface the patch
+provides, and R20 is the first revision to write one.
+
+That the grid is an **additive** offset rather than a replacement or a
+multiplier was established before anything was written, and the evidence is
+recorded in `knowledge/sc8s50-switchpatch-xdf.md` § Per-slot `Spark modifier`
+semantics:
+
+1. The five grids reuse the base ignition maps' own axis tables **byte for
+   byte** — rpm at `0x3ce5a`, airmass at `0x3cdbc`.
+2. They reuse the same codec and declared range: `0.375·raw − 35.625`,
+   −35.625 … +60.0 °CRK.
+3. All five ship neutral at a **decoded 0.00°, not a raw zero** (raw 95). A
+   replacement table shipping at 0.00 would mean slot 4 commands no timing at
+   all; a multiplier would need to ship at 1.0.
+
+What is *not* statically provable is the control-state scope — whether the
+offset applies in every state or only some. A neutral table is indistinguishable
+from one that is never read, and settling it would take a TriCore disassembly of
+the patch's 7,236-byte code block. It does not need settling here, because the
+map fails benign: only the 1200 and 1400 mg/stk rows above 3000 rpm are
+non-zero, so an unexpectedly narrow scope costs advance rather than adding it
+somewhere unintended.
+
+**`PUT setpoint` — map slot 5 boost cap** (uniqueid `0x7d71a`) takes slot 4's
+curve, retiring the R12 valet map.
+
+Slot 5 held a flat 10 psi gauge cap from R12 onward and nothing in the R14–R19
+log record ever selected it. Giving it slot 4's boost is what makes R20 a
+single-variable experiment: the two slots now differ in ignition timing and
+nothing else. The curve is **read off the R19 bin**, never retyped — a
+transcription slip would silently turn the A/B into a comparison of two boost
+targets. `switchpatch.slot_curve` tiles one rpm row across all eight
+uncharacterized Y rows, so the script asserts slot 4's grid is row-uniform
+before using row 0, and cross-checks the read curve against the value this
+script independently declares for slot 4.
+
+### The map
+
+The offsets, in °CRK, written identically into the 1200 and 1400 mg/stk rows:
+
+| rpm         |   3000 |   3500 |   4000 |   4500 |   5000 |   5500 |   6000 |       6500 |
+| ----------- | -----: | -----: | -----: | -----: | -----: | -----: | -----: | ---------: |
+| slot 4 base | −7.500 | −6.750 | −4.500 | −3.750 | −2.250 | +0.750 | +1.875 |     +3.375 |
+| modifier    | +1.125 | +1.500 | +2.250 | +3.000 | +3.750 | +2.250 | +1.500 |     +1.125 |
+| **slot 5**  | −6.375 | −5.250 | −2.250 | −0.750 | +1.500 | +3.000 | +3.375 | **+4.500** |
+
+Every other cell of the 16 × 16 grid stays neutral at 0.00°, so outside WOT
+above 3000 rpm slot 5 *is* slot 4.
+
+**Why this shape.** `Logs/BasicsGuide_R19/log_review.md` established that
+delivered WOT timing on R19 is **scheduling-limited, not knock-limited** at the
+top end — the headroom is real. What 92 AKI could not do is claim it: R17 tried
+and R18 had to retard 4500–5000 rpm back out. Raising fuel octane moves the
+knock boundary itself, which is why this is a fuel change with a calibration
+attached rather than the reverse. The peak sits at 5000 rpm, exactly where R18
+had to give timing back.
+
+**Why these exact values.** The shape was authored as
+1.00 / 1.50 / 2.00 / 2.75 / 3.50 / 2.00 / 1.50 / 1.00. Four of those are not
+storable: the grid holds 0.375 °CRK per step. `slot_spark_map` **refuses** a
+non-storable offset rather than rounding it, naming both neighbours — a silent
+round of +1.00 to +1.125 would be a round *up*, on advance, which is not a
+rounding error anyone should discover from a log. The round-up neighbours were
+chosen deliberately on Sam's direction: the ~4-octane-number dose is worth
+roughly 4° of margin and this map spends about half of it, so rounding up
+preserves that reserve rather than eroding it.
+
+**The delivered-timing ceiling.** The quantity worth capping is base + modifier,
+not the offset: +3.00° onto a cell already at +3.375° is a very different engine
+from +3.00° onto one at −7.50°. `slot_spark_map` requires a
+`max_delivered_degrees`, has no default for it, reads the **live** base map to
+check it, and refuses outright if that map cannot be read rather than passing.
+R20 declares **+5.00 °CRK** and delivers a peak of +4.500. The ceiling is
+deliberately tight: transposing the 5000 rpm offset into the 6500 column would
+deliver +7.125° and be refused.
+
+**The top-row question.** WOT reaches ~1600 mg/stk while the grid's top
+breakpoint is 1400, so what the ECU does above the last row — clamp or
+extrapolate — would decide the effective advance there. R20 does not resolve it;
+it makes it moot by writing the 1200 and 1400 rows identically, so the surface is
+flat going into the top breakpoint and both behaviours give the same answer.
+`slot_spark_map` enforces this rather than trusting the author to remember.
+
+### The fuel — a constraint, not a note
+
+Slot 5 is calibrated for pump 92 AKI dosed with **VP Octanium Unleaded** at
+**10–11 oz per 10 US gallons**. The full record, including the operating rules
+and the stop signals, is `knowledge/octane-booster-and-slot-5.md`, linked from
+`index.md`. Three points belong here too, because they change what is safe:
+
+- **Octanium 2855 must never go in this car.** It contains TEL, and VP states it
+  is for engines without oxygen sensors or catalytic converters. This car has
+  both, and every log review in this repo depends on the wideband O2 sensor.
+- **10–11 oz / 10 gal is the emissions-device-safe ceiling**, worth about 4.2
+  octane numbers. VP's headline "up to 7 numbers" needs 23–32 oz / 10 gal, the
+  non-ECD dose. Do not chase it on this car.
+- **Selecting slot 5 on plain 92 will knock.** Accepted knowingly (origin doc
+  Key Decision 6): the control is discipline, not calibration. Knock control
+  still catches it at −1.50 °CRK per event under R19's halved cut, but being
+  caught by knock control is not the same as being safe to run.
+
+**The valet map is gone** (Key Decision 8). Slots 1 (stock ~21.6 psi), 2
+(conservative) and 3 (intermediate) remain as tamer maps, but nothing hard-caps a
+stranger to 10 psi any more. Restoring a valet cap on another slot is listed in
+`README_NEXT_STEPS.md` if that turns out to matter.
+
+### Verification (authoritative run `R20_20260831-062648`)
+
+- Output: `Tunes/MainTune/MainTune_out/R20_20260831-062648/Patched_259L_R20.bin`.
+  SHA-256:
+  `8c0b4d18ea7491f7c0ea595805abfa2aae3d23b55697e640622a4d26bfe83990`.
+- R19 byte-audit reference SHA-256:
+  `70d4da677f2f623bb6293ae9cb3f90873a16fd3b7dc199d5ff78b844db2047f5`
+  (`R19_20260829-072607` — the flashed bin).
+- Checksums **CLEAN** (`CAL_CRC`, `ECM3`), verified independently after save;
+  final-bin readback **PASS** for all 144 touched tables.
+- Raw-diff audit vs R19 **CLEAN** — 212 changed bytes, all attributed;
+  unexplained = 0. Attributed by hand as well: 192 bytes of the slot 5
+  `PUT setpoint` grid (8 rows × 12 int16 columns), 16 bytes of the slot 5
+  `Spark modifier` grid (16 single-byte cells), and the 4 stored checksum bytes.
+- **Independent XDF decode of both bins** — 3814 base-XDF tables and 185
+  switch-patch tables, zero decode errors — finds exactly **two** changed
+  tables: `0x7d31a` `Spark modifier` (16 cells) and `0x7d71a` `PUT setpoint`
+  (96 cells). Every table under the base XDF is byte-identical to R19,
+  including all `IP_IGA_BAS_*` maps (**AE1**). Slot 4's `Spark modifier` and
+  `PUT setpoint` are byte-identical to R19 (**AE2**). Slot 5's `Spark modifier`
+  reads back with exactly 16 non-neutral cells and 240 at 0.00° (**AE3** — the
+  origin doc's "224" was an arithmetic slip; the grid is 16 × 16 = 256). Slot 5's
+  `PUT setpoint` reads back equal to slot 4's cell for cell, peak 2809 hPa
+  absolute (**AE4**).
+- **Determinism:** four independent runs produced byte-identical bins.
+- Comparison PNGs exist for **both** changed tables, named per table:
+  `compare/Spark modifier 0x7d31a__*.png` and
+  `compare/PUT setpoint 0x7d71a__*.png`.
+- **Negative control — and a correction to what the byte audit proves.** The
+  R20 plan expected that pointing `reference_bin` at the *R18* bin would make
+  the audit fail. **It does not, and should not.** Run that way the audit
+  reports 360 changed bytes, all attributed, unexplained = 0. The reason is the
+  lineage's own convention: a revision re-declares its **entire** calibration,
+  so R20's journal covers all 144 tables including the ones R19 changed, and the
+  allowance derived from that journal legitimately absorbs R19's edits too.
+
+  The audit's actual guarantee is **"no byte changed that this script did not
+  declare"** — not "the reference bin is the one you meant". What enforces the
+  latter is the `R19_REFERENCE_SHA256` check at the top of `main()`, which
+  refuses to build at all against a bin whose hash is not the flashed R19's.
+  Verified: repointing `R19_REFERENCE` at the R18 bin exits 1 with
+  `R19 reference hash mismatch: b3bf96a4… ; expected 70d4da67…` before a single
+  table is read. Both mechanisms are needed and neither substitutes for the
+  other. Future revisions should not expect a wrong-reference audit to fail.
+- Script guards that must hold for the build to finish: every declared offset is
+  positive, finite, and a whole multiple of the 0.375 °CRK storage step; the
+  grid's rpm and airmass axes match the ones the timing constants are written
+  on; slot 5's grid reads the as-patched neutral going in; slot 4's R19 boost
+  grid is row-uniform and matches this script's own slot 4 declaration; after
+  the write, all nine base ignition maps and all four other slots' `Spark
+  modifier` grids are unchanged; and delivered timing never exceeds +5.00 °CRK.
+- The untouched recovery image retained SHA-256
+  `d61a6e297b3ac1d25f60ec8cb3bb504ff47f2db603a960a56e6a6e34074ad69b`.
+
+### Library work this revision required
+
+`SwitchPatch2933` bound 92 tables and the five `Spark modifier` grids were not
+among them, so the revision could not be written at all until the library gained
+them. Two commits on `feat/switchpatch-spark-modifier-grids` in `Code/`:
+
+- **Profile binding** — `S50_SPARK_GRID_UIDS` plus one `TableSpec` per slot;
+  the profile now resolves 97 specs. Slot attribution is from each table's third
+  `CATEGORYMEM` (Map Slot 1–5), **not** from the tidy `0x100` address stride,
+  which would have been a guess that happened to be right. The grid **shape
+  travels with the address book** rather than being a constant of the patch:
+  A05's grids are (16, 18), not (16, 16), and because these tables bind by
+  uniqueid a wrong shape resolves perfectly and writes wrong.
+- **`slot_spark_map()`** — the one guarded, journaled write path, with the four
+  guards described above. Generic bridge edits to it are refused, matching the
+  existing domain-owned-table contract.
+
+One defect surfaced during R20's own verification and was fixed in the same
+branch: comparison plots are named from a table's symbol, and every patch-added
+table's "symbol" is the XDF description line `|X: x|Y: y`. Both of R20's changed
+tables therefore wrote to the same three PNG filenames and one silently
+overwrote the other — the review gate would have been looking at one table
+believing it was looking at two. Plot stems now carry the uniqueid whenever the
+name is not shaped like an A2L symbol.
+
+### Human review and logging gate
+
+Review the R19→R20 comparison plots for **both** changed tables. They are the
+only two that may differ: **the nine base ignition maps and every slot 4 table
+must show no change at all**, or slot 4 is no longer the control this revision is
+measured against.
+
+**This revision's validation is a within-session A/B, and it will be worthless if
+it is logged the way every previous revision was logged.** The protocol:
+
+1. **One dosed tank.** 10–11 oz VP Octanium **Unleaded** per 10 US gallons,
+   mixed, before the session. Not 2855.
+2. **At least three slot-5 and three slot-4 pulls, interleaved** — alternate
+   slots, do not do all of one then all of the other. Same road, same direction,
+   cool air.
+3. Full actual-3rd-gear WOT pulls to redline, **holding WOT into 4th** after the
+   upshift, as with R18 and R19.
+4. **Per-cylinder knock-sensor channels in the logging list.**
+5. **Drop a `*.bin.txt` record of the flashed file into `Logs/MainTune_R20/`.**
+   Three revisions are now in play and a log folder cannot otherwise prove which
+   bin produced it.
+
+What decides whether R20 worked:
+
+1. **The timing actually arrives** (**AE5**) — at matched rpm and airmass, slot 5
+   `Ign Table` should sit above slot 4 by approximately the modifier row above.
+   Note that `Ign Table` is the base-table output, not final commanded timing;
+   the R19 fit reproduces it from a pure lookup to 0.184° rms, which is what
+   makes this a readable measurement. If the gap is absent, the `Spark modifier`
+   does not apply in this control state and the whole approach is wrong — that
+   is the single most informative outcome this session can produce.
+2. **Knock character** (**AE6**) — no `Knock Cyl n` channel below −1.50 °CRK, and
+   no window with two cylinders retarding in the same sample. Character, not
+   depth: one settled event that recovers is a working knock loop.
+3. **Power** (**AE7**) — slot 5 above slot 4 on peak F=ma wheel hp in the same
+   session, computed with the in-gear trim from the `Calc HP` gear-flip rule.
+4. **Boost is unchanged between slots.** Slot 5 carries slot 4's curve exactly,
+   so any boost difference between the two is instrumentation or conditions, not
+   calibration — and a real one would invalidate the single-variable claim.
+
+**Stop signals** — switch to slot 4 immediately and end the session: retard
+deeper than −1.50 °CRK, retard that ramps rather than decaying, two cylinders
+retarding in the same sample, accumulated retard approaching the untouched
+`IP_IGA_MAX_KNK` — Maximum value for spark retard floor, or loss of lambda or
+fuel-pressure control.
+
+**Carried forward, unresolved:** `Tunes/MainTune/tune_code_review.md` P1 against
+the R19 intake-axis re-breakpoint is still open. R19 was flashed with it open
+(recorded in § R19); R20 inherits that geometry unchanged and does not resolve
+it. It is not a reason to hold R20 — R20 changes nothing in that domain — but it
+is still owed a part-throttle high-rpm log.
+
+Still **revision 20 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.

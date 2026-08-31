@@ -109,6 +109,13 @@ Caveats:
 
 ## Per-slot `Spark modifier` — semantics (R20 plan U1, 2026-08-30)
 
+> [!note] Written for the first time in R20
+> `Tunes/MainTune/TUNE_MainTune_R20.py` writes slot 5's grid — 16 of 256 cells,
+> +1.125 to +3.750 °CRK across 3000–6500 rpm in the 1200 and 1400 mg/stk rows —
+> through `tune.switchpatch.slot_spark_map()`, the one guarded write path. Slot
+> 5 is calibrated for an octane-boosted tank: see [[octane-booster-and-slot-5]]
+> before selecting it, and `Tunes/REV_LOG.md` § R20 for the lineage record.
+
 `Spark modifier` is a per-slot **16x16 additive ignition-angle offset**, in
 degrees CRK, laid on the *same grid as the shared base ignition maps*. Five
 copies exist, one per map slot, at a `0x100` stride:

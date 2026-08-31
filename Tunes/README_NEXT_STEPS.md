@@ -10,11 +10,22 @@ This file now lives at the `Tunes/` root and spans both project folders: it
 tracked `TuningBasicsGuide` (R00–R15) alone until R15, and continues into
 `MainTune` (R16 onward) — see `REV_LOG.md` for the project split.
 
-Current lineage tip: **R19 — built and verified, awaiting human review and a
-flash**. It is the first revision to touch knock control, and the first since
-R07 to move two domains at once (knock fast loop + wastegate feedforward), on
-Sam's direction — see `REV_LOG.md` § R19 for the rationale and the guardrails.
-Its predecessor **R18 was flashed, logged twice, and validated**. See
+Current lineage tip: **R20 — built and verified, awaiting human review and a
+flash**. It turns map slot 5 into an octane-boosted timing map (slot 4's boost
+curve plus a per-slot `Spark modifier` advance) for a tank dosed with VP
+Octanium **Unleaded**, and is the first revision whose validation is a
+**within-session A/B** rather than a comparison against the previous session.
+Read `REV_LOG.md` § R20 and [[octane-booster-and-slot-5]] before selecting slot 5
+— the fuel constraint is part of the calibration.
+
+Its predecessor **R19 was flashed, logged, and reviewed** on 2026-08-30 (see
+`Logs/BasicsGuide_R19/log_review.md`): it met all five of its measurements, but
+it was flashed with code-review P1 open against the intake-axis re-breakpoint,
+which that session did not test and which is **still open**. R19 was the first
+revision to touch knock control, and the first since R07 to move two domains at
+once (knock fast loop + wastegate feedforward), on Sam's direction.
+
+**R18 was flashed, logged twice, and validated.** See
 `Logs/BasicsGuide_R18/log_review.md`. Both outstanding data steps landed on
 2026-08-28: the cool-air re-log (8 pulls at 26.6 °C loaded IAT, matching the R17
 baseline) and the per-cylinder knock-sensor channels. Their answers:
@@ -66,8 +77,10 @@ throttle setpoint parked at ~30 psi never binds. Still unconfirmed:
   ~21.6 psi and that the shared tuned base (timing, lambda, wastegate) behaves
   sanely at the lower boost target — a stock *slot* is not a stock ECU.
 - **Slot 2 (conservative)** and **slot 3 (intermediate)** — both moved in R14.
-- **Slot 5 (valet)** — byte-untouched by R14 and validated at R12, so lowest
-  priority, but unconfirmed on this bin.
+- **Slot 5** — was the valet cap (byte-untouched by R14, validated at R12) and
+  never driven on this bin. **R20 retired the valet map**: slot 5 now carries
+  slot 4's boost curve plus its own timing advance, so this item is superseded —
+  what needs confirming there is the R20 A/B, not a 10 psi cap.
 
 One gentle 3rd-gear pull per slot closes this, and the check is automated:
 `python3 Logs/BasicsGuide_R14/verify_slot_identity.py` scores any log against all
@@ -462,9 +475,16 @@ actual-3rd-gear pulls to redline). That single session separates heat from
 calibration for both open questions — whether the 4798 rpm residue persists, and
 whether the 5700–6100 rpm knock is thermal.
 
-## R19 — BUILT 2026-08-28. Knock fast loop plus a sized wastegate close
+## R19 — FLASHED, LOGGED, AND REVIEWED 2026-08-30. Knock fast loop plus a sized wastegate close
 
-**Status: scripted, built, and verified; awaiting human review and a flash.**
+**Status: flashed, logged, and reviewed** — `Logs/BasicsGuide_R19/log_review.md`.
+It met all five of its measurements and produced nothing dangerous. Two
+caveats travel with that result: the human review gate was **never closed**
+before the flash, and code-review **P1 against the intake-axis re-breakpoint
+is still open** and untested by that session. `REV_LOG.md` § R19 records
+both.
+
+*Original status when written: scripted, built, and verified; awaiting human review and a flash.*
 `Tunes/MainTune/TUNE_MainTune_R19.py`, output
 `MainTune_out/R19_20260828-133356/Patched_259L_R19.bin`. The authoritative
 record is now `REV_LOG.md` § R19 — read that, not this section, for what shipped.
@@ -603,7 +623,47 @@ tables are patch-added and have **no A2L IDs** — reference them by title. See
 
 ---
 
-## R20 candidate — the redline over-delivery, and the axis row R19 could not spare
+## R20 — BUILT 2026-08-31. Slot 5 becomes the octane-boosted timing map
+
+**Status: scripted, built, and verified; awaiting human review and a flash.**
+`Tunes/MainTune/TUNE_MainTune_R20.py`. The authoritative record is
+`REV_LOG.md` § R20 — read that, not this section.
+
+Exactly two tables change, both slot 5's: `Spark modifier` — map slot 5 ignition
+offset gains 16 of 256 cells (+1.125 to +3.750 °CRK across 3000–6500 rpm in the
+1200 and 1400 mg/stk rows), and `PUT setpoint` — map slot 5 boost cap takes slot
+4's curve, read off the R19 bin. Slot 4 is byte-identical to R19 and is the
+control.
+
+What this queue owes the next session:
+
+- **The A/B protocol is the whole point.** At least three slot-5 and three
+  slot-4 pulls, **interleaved**, one dosed tank, same road, cool air,
+  per-cylinder knock channels in the list, and a `*.bin.txt` in
+  `Logs/MainTune_R20/`. Logged as a normal single-slot session, R20 measures
+  nothing.
+- **The fuel is part of the calibration.** VP Octanium **Unleaded** only —
+  2855 is leaded and would destroy the catalyst and the O2 sensor every log
+  review depends on. 10–11 oz per 10 US gallons. See
+  [[octane-booster-and-slot-5]].
+- **The valet map is gone.** Nothing hard-caps a stranger to 10 psi any more.
+  Restoring a valet cap on another slot is an open option if that matters.
+- **Half the octane credit is unspent** (~2° of ~4°). A follow-up revision
+  spending the rest is gated on R20 logging clean — do not queue it before the
+  A/B session exists.
+- **Deferred library work R20 touched but did not finish:** the five
+  `Lambda modifier` grids (same profile gap, same shape family) are still
+  unbound — deliberately, so an unexercised write path does not ship on the back
+  of a revision that does not use it; A05's `Spark modifier` uniqueids are still
+  unknown, and the shape to pass when they are read is **(16, 18)**, not
+  (16, 16); and the Android app has no surface for editing a 16 × 16 per-slot
+  grid.
+
+## R21 candidate — the redline over-delivery, and the axis row R19 could not spare
+
+*(Renumbered: R20 went to the slot-5 booster timing map instead. This section is
+unchanged otherwise, and its "do not size this from the R18 logs" warning now
+applies doubly — R19 has been flashed and logged since it was written.)*
 
 R19 did the intake-axis re-breakpoint (1.25 → 1.15) and it worked: the 5000–6000
 rpm shortfall goes from −7.3/−4.3 kPa to a predicted −3.8/−0.8. What it could
@@ -658,9 +718,10 @@ be verified.
 - Characterize the patch-added **`PUT setpoint`** grid's unlabelled Y axis
   (raw 0–7 at `0xC836`) before considering any non-tiled treatment.
 - Confirm slot selection and the R09-proven `min()` behavior in-car, beginning
-  with slot 1 before exercising slot 3 and finally the new slot-5 valet cap.
-  Review `IP_PUT_SP` — Pressure up throttle setpoint tracking against each
-  selected slot's explicit cap; slot 5 must not exceed 10 psi gauge at WOT.
+  with slot 1 before exercising slot 3. Review `IP_PUT_SP` — Pressure up
+  throttle setpoint tracking against each selected slot's explicit cap.
+  (The slot-5 10 psi clause that used to close this bullet is **obsolete as of
+  R20**, which gave slot 5 slot 4's ~26 psi curve.)
 - Review turbo speed, HPFP effective volume and rail hold, lambda, knock,
   `IP_PQ_CHA_MAX` — Maximum allowed pressure quotient at turbo charger
   compressor limiting, and P0234 margin. R12 retains slot 3's former 26 psi
