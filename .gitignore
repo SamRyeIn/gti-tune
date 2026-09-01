@@ -1,6 +1,11 @@
 # Independent nested repo (simoscal library — github.com/SamRyeIn/simoscal)
 Code/
 
+# Separate ML side-project tree (simos-ml-diagnostics) — its own pyproject,
+# .venv and .gitignore, plus ~300 MB of venv and run results. Not part of the
+# tuning lineage this repo tracks.
+ML/
+
 # Third-party / reference-only material (large, not ours)
 BinToolz-main/
 References/
