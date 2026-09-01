@@ -48,6 +48,10 @@ the final review remain human-only steps.
 | R16      | `TUNE_MainTune_R16.py`     | First MainTune revision. R15 calibration + exact guide-author Spark IAT axis/grid, a curve-preserving shared-axis migration of the Reference IGA correction, and the EQT Stage 2 log's 5000-rpm-up `Ignition Table Output` curve across 1050/1200/1400 mg/stk in all nine VVL-0 port-flap-low base-timing maps. CAL-flash eligible after the R07 patch set is installed. |
 | R17      | `TUNE_MainTune_R17.py`     | R16 calibration with all R04 and R16 base-timing overlays removed: every cell in all nine `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0 port-flap-low maps matches the tuning basics guide exactly; the R16 Spark-IAT family remains unchanged. CAL-flash eligible after the R07 patch set is installed.                                        |
 | R18      | `TUNE_MainTune_R18.py`     | R17 calibration + a logged local timing correction in all nine `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle, VVL 0 port-flap-low maps: −0.75° at 4500 rpm and −1.50° at 5000 rpm in the 1200/1400 mg/stk rows. All other calibration tables stay byte-identical to R17. CAL-flash eligible after the R07 patch set is installed.                      |
+| R19      | `TUNE_MainTune_R19.py`     | R18 calibration + the guide's knock fast-loop tables (`IP_IGA_DEC_KNK` — Spark retard at recognised knocking and its two recovery companions), so one detected event costs ~−1.50° instead of −3.00° and hands timing back faster; plus a sized close of two `IP_FAC_BPA_SP[0]`/`[1]` — Map for boost pressure actuator setpoint cells on a re-breakpointed intake-flow axis. CAL-flash eligible after the R07 patch set is installed. |
+| R20      | `TUNE_MainTune_R20.py`     | R19 calibration + slot 5 stops being the valet map: it takes slot 4's boost curve (read off the R19 bin, not retyped) and gains its own `Spark modifier` — map slot 5 ignition offset of +1.125 to +3.750 °CRK across 3000–6500 rpm in the 1200/1400 mg/stk rows, for a VP Octanium Unleaded–dosed tank. Two tables move, both slot 5's. CAL-flash eligible after the R07 patch set is installed. |
+| R21      | `TUNE_MainTune_R21.py`     | R20 calibration + a cut to slot 5's `Spark modifier` — map slot 5 ignition offset from the R20 log evidence: the 4000 and 4500 rpm columns come down to +1.500 °CRK (−0.750 / −1.500) because 4500–5000 rpm ran 27.5 knock events per loaded minute against R19 slot 4's 4.2. The +3.750° apex at 5000 rpm and everything above it are held. Exactly one table moves, 4 cells. CAL-flash eligible after the R07 patch set is installed. **Built and verified, never flashed; superseded by R22.** |
+| R22      | `TUNE_MainTune_R22.py`     | R20 calibration + the map slot ladder reordered by **fuel requirement** instead of by boost, and a second octane arm. The aggressive ~26 psi curve moves from slot 4 down to slot 3 (read off the R20 bin, not retyped) and becomes the pump-gas everyday map, the in-drive fallback, and the A/B control; the intermediate ~24.4 psi curve moves up to slot 4 and gains R20's **uncut** `Spark modifier` — map slot 4 ignition offset; slot 5 keeps its ~26 psi curve and R21's **cut** offset. Slots 1–3 are pump-92 safe, slots 4–5 need the dosed tank. Three arms — control, reduced boost, reduced timing — testable in one session. Slot 1 also stops being the factory curve above 4400 rpm, taking slot 2's there and falling to ~17.2 psi at redline. Five tables move, all per-slot. CAL-flash eligible after the R07 patch set is installed. |
 
 ## R00 — Initial revision
 
@@ -1973,4 +1977,495 @@ it. It is not a reason to hold R20 — R20 changes nothing in that domain — bu
 is still owed a part-throttle high-rpm log.
 
 Still **revision 20 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.
+
+## R21 — cut slot 5's peak-load timing, keep the top end
+
+R21 inherits the complete R20 calibration byte for byte and changes **exactly
+one table**: slot 5's `Spark modifier` — map slot 5 ignition offset, in two of
+its eight written rpm columns. Four cells move. Slot 5's `PUT setpoint` — map
+slot 5 boost cap, the nine `IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic
+ignition angle maps, and every slot 4 table are untouched, which is what keeps
+slot 4 usable as the control.
+
+Script: `Tunes/MainTune/TUNE_MainTune_R21.py`. Output:
+`MainTune_out/R21_20260831-155410/Patched_259L_R21.bin`.
+
+### What the R20 logs actually said
+
+`Logs/BasicsGuide_R20/` holds ten dosed-tank pulls from 2026-08-31. The R20
+gate asked for an interleaved within-session slot-4 / slot-5 A/B and **did not
+get one — all ten pulls were slot 5** (every pull carries the modifier in
+`Ign Avg`). R20 therefore had to be scored cross-session against R19's eight
+slot-4 pulls, with day and fuel left as explicit confounds. Same event
+definitions (`knock_events` / `loaded_mask`, all gears, pedal ≥ 90%, rpm ≥ 3000,
+airmass ≥ 0.9 g/stk, TPS ≥ 60%):
+
+| Band (rpm) | R19 ev/loaded-min | R20 ev/loaded-min | Mean mg/stk | R20 modifier   | Read                                    |
+|------------|-------------------|-------------------|-------------|----------------|-----------------------------------------|
+| 3000–3500  | 43.2              | 40.5              | 1278        | +1.12 → +1.50  | pre-existing, R20 did not cause it      |
+| 3500–4000  | 0.0               | 9.4               | 1517        | +1.50 → +2.25  | 1 event, noise                          |
+| 4000–4500  | 7.9               | 6.3               | 1518        | +2.25 → +3.00  | flat                                    |
+| 4500–5000  | 4.2               | 27.5              | 1505        | +3.00 → +3.75  | **the regression** — p ≈ 0.0006         |
+| 5000–5500  | 9.7               | 0.0               | 1423        | +3.75 → +2.25  | apex is clean, and improved             |
+| 5500–6000  | 4.0               | 6.0               | 1305        | +2.25 → +1.50  | flat                                    |
+| 6000–6600  | 6.7               | 22.1              | 1204        | +1.50 → +1.12  | 3 events vs 1 — does not separate       |
+
+Only 4500–5000 separates from noise: 6 events against an exposure-matched
+expectation of 0.9, and the only band in the session to exceed one detected
+event's worth of retard — two −2.25 °CRK cuts, at 4615 and 4653 rpm. Session
+totals were 15.33 ev/loaded-min on R20 against 8.63 on R19, worst −2.25 against
+−1.50.
+
+Two things that look like findings and are not. **3000–3500 is pre-existing**:
+it is the highest-rate band in either session and R19 ran 43.2/min there with no
+modifier at all, so it is not R20's to fix and R21 does not touch it. **6000–6600
+does not separate**: 3 events against 1 on comparable exposure is Poisson
+p ≈ 0.3.
+
+Sam's mixing hypothesis — that the octane dose had not blended and the early
+pulls were effectively on lower octane — was tested and **is not supported**.
+Rank correlation of knock retard area with minutes into the drive is +0.008
+across the nine full pulls; the cleanest pull of the session is the second one
+(zero retard, and the session's highest peak rpm at 6368), the worst is in the
+middle at 6.2 min, and thirds of the sequence run 1.05 → 2.65 → 1.35 °CRK·s.
+Oil temperature is effectively a clock here (+0.983 with time) yet correlates
+only +0.084 with knock area, so heat soak is not the driver either. This rules
+out mixing *progressing during the logged session*; it cannot rule out that the
+dose had already blended before the first pull. Evidence:
+`Logs/BasicsGuide_R20/plots/r20_knock_timeline.png`,
+`Logs/BasicsGuide_R20/analyze_r20_knock_timeline.py`.
+
+### The shape, and why the cut is not at the peak
+
+The counterintuitive result is that the **+3.750 °CRK apex at 5000 rpm produced
+zero knock** over 9.5 s of exposure and improved on R19's 9.7/min, while the
++3.000 cell at 4500 produced six events. The separating variable is cylinder
+filling: 1505 mg/stk mean across 4500–5000 against 1423 across 5000–5500. So
+R21 cuts the peak-load shoulder and holds the apex.
+
+    rpm       3000    3500    4000    4500    5000    5500    6000    6500
+    base     -7.500  -6.750  -4.500  -3.750  -2.250  +0.750  +1.875  +3.375
+    R20      +1.125  +1.500  +2.250  +3.000  +3.750  +2.250  +1.500  +1.125
+    R21      +1.125  +1.500  +1.500  +1.500  +3.750  +2.250  +1.500  +1.125
+    slot 5   -6.375  -5.250  -3.000  -2.250  +1.500  +3.000  +3.375  +4.500
+
+Mean offset across the 4500–4700 knock cluster falls from +3.15 to +1.95 °CRK;
+the two −2.25 °CRK cut points fall from +3.17/+3.23 to +2.02/+2.19. The 4000
+column comes down with 4500 so the interpolation into the cut does not restore
+the same offset at 4250 rpm — on its own 4000–4500 was flat between sessions and
+is not independently indicted. Delivered timing still peaks at +4.500 °CRK at
+6500 rpm, unchanged from R20, because the cut is below the peak.
+
+### Why the rpm breakpoints did not move
+
+Sam asked whether a breakpoint change would help. It would — a breakpoint near
+4700 rpm separates the peak-load shoulder from the clean apex far better than
+the existing columns can — but **it is not available**. The `Spark modifier`
+grid's rpm axis `0x3CE5A` and airmass axis `0x3CDBC` are each referenced by
+**37 tables**: all 18 `IP_IGA_BAS_IVVT_VVL_PORT_L` — Basic ignition angle maps
+(both VVL banks × 9) *and* all five slots' `Spark modifier` grids. Moving a
+breakpoint would silently re-index the entire ignition calibration on every
+slot, including slot 1 (stock) and slot 4 (the everyday map and this revision's
+control). The shape is expressed on the existing columns instead. This is the
+blast-radius grep the `shared-axis-editing` rule exists for, and it is the
+second time in this lineage that it has changed a design.
+
+### Deliberately single-variable
+
+Sam also asked about adding timing near redline. It was considered and declined
+for this revision, and queued for R22:
+
+- **6500 rpm is nearly capped already.** R20 delivers base +3.375 + 1.125 =
+  **+4.500 °CRK** against the script's `MAX_DELIVERED_DEG` = +5.00 guard. The
+  next storable step (+1.500 modifier → +4.875 delivered) is the last one that
+  fits; going further means raising the safety ceiling itself.
+- **6000 rpm has room** — base +1.875, so the modifier could reach +3.000
+  (delivered +4.875) inside the same guard.
+- **But 6000–6600 is the band that went 6.7 → 22.1 ev/min.** The sample is too
+  small to call a regression, and equally too small to call it headroom.
+- **And R20's own lesson was about readability.** A revision that cuts at 4500
+  and raises at 6000 cannot be read either way by the next session — which is
+  exactly what the missing slot-4 A/B already cost R20.
+
+Also queued for R22: writing the 1049.97 mg/stk row. At 6000+ rpm airmass runs
+~1204 mg/stk, right at the 1200.01 breakpoint, so the grid interpolates down
+toward the neutral row and only ~90% of the column value is actually delivered
+at redline.
+
+### Verification
+
+- `build()` reports **checksums CLEAN** (CAL_CRC, ECM3), **final-bin readback
+  PASS** (144 tables re-read off the saved file and matched to the journal), and
+  a **raw-diff audit vs `Patched_259L_R20.bin`: CLEAN — 8 changed bytes, all
+  attributed, unexplained = 0** (4 journaled edit bytes = 2 columns × 2 rows at
+  1 byte per cell, plus 4 stored checksum bytes).
+- **Independent XDF decode of both bins** — 3814 base-XDF tables and 185
+  switch-patch tables, zero decode errors — finds exactly **one** changed table:
+  `0x7d31a` `Spark modifier`, 4 cells. Every base ignition map and every slot 4
+  table is byte-identical to R20.
+- **Determinism:** two independent runs produced byte-identical bins,
+  SHA-256 `ec2374f693752640c800ee8ed2fc9a87bbe6e5813c7687d56ef3843e028ca5c6`.
+- The `R20_REFERENCE_SHA256` gate at the top of `main()` refuses to build at all
+  against a reference bin whose hash is not the flashed R20's
+  (`8c0b4d18ea7491f7c0ea595805abfa2aae3d23b55697e640622a4d26bfe83990`). As
+  recorded in § R20, the byte audit alone does not prove the reference is the
+  one you meant — that gate does, and both are needed.
+- Script guards added for R21 specifically: the declared shape must differ from
+  R20's in **exactly** the two declared columns, and every changed column must
+  move **down**. A transposed or mis-indexed edit that happened to stay on the
+  0.375 °CRK lattice would otherwise reach the ECU looking deliberate. The R20
+  guards all still run: positive, finite, storable offsets; axes matching the
+  ones the timing constants are written on; slot 5 neutral going in; base maps
+  and the other four slots unchanged after the write; delivered timing ≤ +5.00.
+- Only one table has comparison PNGs, which is itself the check —
+  `compare/Spark modifier 0x7d31a__*.png`.
+
+### Human review and logging gate
+
+Review the single R20→R21 comparison plot. It is the only table that may differ.
+**Slot 5's boost cap, the nine base ignition maps, and every slot 4 table must
+show no change at all**, or slot 4 is no longer the control.
+
+**Log this one the way R20 was supposed to be logged.** R20's protocol was
+correct and was not followed; R21 is unreadable without it:
+
+1. **One dosed tank.** 10–11 oz VP Octanium **Unleaded** per 10 US gallons,
+   mixed, before the session. Not 2855.
+2. **At least three slot-5 and three slot-4 pulls, interleaved** — alternate
+   slots, do not do all of one then all of the other.
+3. Full actual-3rd-gear WOT pulls to redline, **holding WOT into 4th** after the
+   upshift. The 4th-gear continuation is not optional: R20's second-deepest cut
+   (−2.25 °CRK on pull 8) is only visible there.
+4. **Per-cylinder knock-sensor channels in the logging list.**
+5. Log folder `Logs/MainTune_R21/`. The flashed bin is recorded automatically in
+   the CSV header's last column (`SimosTools [R2.12:…:Patched_259L_R21.bin]`),
+   so a separate `*.bin.txt` is redundant — but check that column matches.
+
+What decides whether R21 worked:
+
+1. **The 4500–5000 band comes back down** toward R19's 4.2 ev/loaded-min. This
+   is the whole question.
+2. **The 5000–5500 apex stays clean** at its unchanged +3.750 °CRK. If it starts
+   knocking now, the read that load rather than offset size is binding was wrong.
+3. **Power** — slot 5 above slot 4 on peak F=ma wheel hp in the same session,
+   in-gear trimmed per the `Calc HP` gear-flip rule. R20 measured 263 hp (8
+   pulls) against R19's 256 (6 pulls), cross-session.
+4. **Boost identical between slots**, since slot 5 still carries slot 4's curve
+   exactly.
+
+**Stop signals** — switch to slot 4 and end the session: retard deeper than
+−1.50 °CRK that does not recover, retard that ramps rather than decaying, two
+cylinders retarding in the same sample sustained, accumulated retard approaching
+the untouched `IP_IGA_MAX_KNK` — Maximum value for spark retard floor, or loss
+of lambda or fuel-pressure control.
+
+**Carried forward, unresolved.** `Tunes/MainTune/tune_code_review.md` P1 against
+the R19 intake-axis re-breakpoint is still open; R21 inherits that geometry
+unchanged and does not resolve it, and it is still owed a part-throttle high-rpm
+log. R20's AE6 gate as written ("no channel below −1.50 °CRK, no window with two
+cylinders retarding in the same sample") **failed on both counts** — pull 5 and
+pull 8 both reached −2.25, and pulls 7 and 8 had 13 and 23 two-cylinder samples,
+at 3048/3149 rpm in the pre-existing low-rpm zone. R21 does not address that
+zone; it is a candidate for a later revision.
+
+Still **revision 21 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.
+
+## R22 — reorder the slot ladder by fuel requirement, add the mid-boost octane arm
+
+R22 inherits the complete R20 calibration and changes **five tables, all of them
+per-slot**: the `PUT setpoint` — map slot boost caps of slots 1, 3 and 4, and the
+`Spark modifier` — map slot ignition offsets of slots 4 and 5. Slots 3 and 4
+exchange curves; slot 1 takes slot 2's curve above 4400 rpm. Slot 5's boost cap
+and slot 2 are unchanged from R20. Every shared table — the nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle maps, the knock
+fast-loop tables, the wastegate feedforward and its re-breakpointed intake axis,
+the Spark IAT tables, fueling, limiters, and the patch set — is untouched.
+
+Script: `Tunes/MainTune/TUNE_MainTune_R22.py`. Output:
+`MainTune_out/R22_20260901-060746/Patched_259L_R22.bin`.
+
+**R21 is superseded and was never flashed.** It was built and fully verified
+(§ R21), but the car still holds R20, so R22's byte-level audit is taken against
+the R20 bin — that diff is the change that actually reaches the ECU. R21's slot 5
+timing is carried forward byte for byte; nothing about it was rejected.
+
+### Why the ladder had to move
+
+R14 ordered the five slots least-to-most **boost**. That stopped being the right
+axis in R20, when slot 5 became a *timing* map rather than a boost map: a slot
+that runs slot 4's boost with more ignition advance has no position on a boost
+ladder, and "slot 4 is the safe one" — the rule every stop-signal instruction in
+this lineage was written around — stopped describing anything structural.
+
+R22 orders the ladder by **fuel requirement** instead:
+
+| Slot | Boost                                         | Timing           | Fuel      | Role                                         |
+|------|-----------------------------------------------|------------------|-----------|----------------------------------------------|
+| 1    | ~21.6 psi to 3800 rpm, then slot 2's to ~17.2 | base             | pump 92   | low / bad tank / handing the keys over       |
+| 2    | conservative ~24.5                            | base             | pump 92   |                                              |
+| 3    | aggressive ~26.0                              | base             | pump 92   | **everyday map, in-drive fallback, control** |
+| 4    | mid ~24.4 psi                                 | R20 octane shape | **dosed** | the reduced-**boost** arm                    |
+| 5    | aggressive ~26.0                              | R21 octane shape | **dosed** | the reduced-**timing** arm                   |
+
+Slots 1–3 are safe on any tank; slots 4 and 5 require the VP Octanium dose. That
+boundary is a single line in the ladder rather than a fact about one slot, which
+is the whole reason for the reorder.
+
+The shuffle is a **permutation of curves the car has already run**, not a
+recalibration. The aggressive ~26 psi curve that has been slot 4 since R14 moves
+down to slot 3 unchanged, and the intermediate ~24.5 psi curve that was slot 3
+moves up to slot 4. Both are *read off the R20 bin* by `_curve_from_r20` rather
+than retyped, and each read is checked against the curve this script
+independently declares — so the control arm provably keeps the exact calibration
+every log from R14 through R20 was scored against. Nothing is deleted except the
+intermediate slot's *position*; slot 1's stock map survives, and with the R12
+valet cap already spent on slot 5 back in R20 it is the only genuinely low map
+left in the ladder.
+
+### Slot 1 sheds boost at high rpm
+
+Slot 1 is still **named** the stock map and is still the least aggressive slot,
+but from R22 that name is not a claim about the whole range. At and above 4400
+rpm it takes slot 2's conservative curve, which sits **below** the factory
+`IP_PUT_SP` — Pressure up throttle setpoint target there:
+
+| rpm     | 3000 | 3200 | 3400 | 3800 | 4400 | 4700 | 5000 | 5400 | 5750 | 6000 | 6250 | 6500 |
+|---------|------|------|------|------|------|------|------|------|------|------|------|------|
+| factory | 2502 | 2502 | 2502 | 2503 | 2503 | 2504 | 2504 | 2505 | 2505 | 2505 | 2506 | 2506 |
+| slot 2  | 2699 | 2659 | 2619 | 2540 | 2440 | 2395 | 2350 | 2323 | 2299 | 2266 | 2232 | 2199 |
+| slot 1  | 2502 | 2502 | 2502 | 2503 | 2440 | 2395 | 2350 | 2323 | 2299 | 2266 | 2232 | 2199 |
+
+So slot 1 holds ~21.6 psi to 3800 rpm and then falls with slot 2 to **~17.2 psi
+at 6500 rpm**, against the factory ~21.6. It gets *less* aggressive exactly where
+cylinder pressure and knock risk are worst, and its low end keeps the factory
+value — still read live off the recovery bin by `_stock_full_load_curve`, so the
+provenance R14 established survives for the part of the range where the factory
+number is the conservative one.
+
+**Why the threshold is expressible at all.** The two curves cross at roughly 4020
+rpm: below it the factory target is the lower of the two, above it slot 2's is.
+The shared slot axis steps 3800 then 4400, with no 4100 breakpoint, so any
+threshold in (3800, 4400] produces the identical curve — and because the crossing
+falls in that same interval, the composed curve is exactly the **lower** of the
+two at every breakpoint. `_slot1_curve` asserts that rather than leaving it as a
+coincidence: a threshold moved off the crossing would have slot 1 silently taking
+the *higher* value somewhere, which is a boost lift on the map that exists to be
+the safe one.
+
+`_check_slot_ladder` also asserts slot 1 sits at or below **every** other slot at
+every breakpoint. Composing a slot from two curves instead of reading one makes
+that worth checking rather than assuming.
+
+Slot 1 and slot 2 are now byte-identical from 4400 rpm up, which is visible in
+the plot as slot 1's dashed line running on top of slot 2's. They still differ
+below it — slot 2 starts at 2699 hPa and decays, slot 1 holds the flat factory
+value — so the two slots remain distinct maps.
+
+### What this costs, and it is not nothing
+
+**The in-drive fallback moved from slot 4 to slot 3.** Every stop-signal
+instruction in §§ R20–R21 said "switch to slot 4 immediately"; slot 4 is now one
+of the two maps that *needs* good fuel. From R22 the fallback is **slot 3**.
+
+**Log review inherits the same hazard.** In any log before R22, slot 4 means the
+aggressive pump-gas control. In any log from R22 on, it means the mid-boost
+octane map. The two have different boost curves, so they are distinguishable
+after the fact — but the selected slot must be **recorded per session**, not
+inferred from the slot number's history. This is the single most likely way to
+misread the next log folder.
+
+### The experiment R22 actually runs
+
+R20's logs said the 4500–5000 rpm knock tracked **cylinder filling**, not offset
+size: the band ran 1505 mg/stk and 27.5 events per loaded minute against R19 slot
+4's 4.2 (Poisson p ≈ 0.0006), carrying both of the session's −2.25 °CRK cuts,
+while the larger +3.750 °CRK apex at 5000 rpm ran 1423 mg/stk and logged **zero**
+events over 9.5 s (§ R21, `Logs/BasicsGuide_R20/log_review.md`).
+
+There are two ways to act on that reading, and R21 only took one of them. R22
+runs both, against the same control, in the same session, on the same tank:
+
+| rpm         | 3000   | 3500   | 4000   | 4500   | 5000   | 5500   | 6000   | 6500   |
+|-------------|--------|--------|--------|--------|--------|--------|--------|--------|
+| base        | −7.500 | −6.750 | −4.500 | −3.750 | −2.250 | +0.750 | +1.875 | +3.375 |
+| slot 3 mod  | —      | —      | —      | —      | —      | —      | —      | —      |
+| slot 4 mod  | +1.125 | +1.500 | +2.250 | +3.000 | +3.750 | +2.250 | +1.500 | +1.125 |
+| slot 5 mod  | +1.125 | +1.500 | +1.500 | +1.500 | +3.750 | +2.250 | +1.500 | +1.125 |
+| slot 4 dlvd | −6.375 | −5.250 | −2.250 | −0.750 | +1.500 | +3.000 | +3.375 | +4.500 |
+| slot 5 dlvd | −6.375 | −5.250 | −3.000 | −2.250 | +1.500 | +3.000 | +3.375 | +4.500 |
+
+- **Slot 4** holds R20's *uncut* timing — the timing that knocked — and removes
+  ~1.6 psi of boost instead.
+- **Slot 5** holds R21's cut timing on the full boost curve.
+- **Slot 3** holds neither, on the full boost curve.
+
+Each octane arm differs from the control in exactly one dimension, and the two
+arms differ from each other in exactly two rpm columns of timing and one boost
+curve. If slot 4 runs clean at 4500–5000 where R20 knocked, cylinder filling is
+confirmed as the binding variable and trading boost for timing is on the table.
+If it knocks anyway, offset size is what matters and R21's cut is the right
+shape. Either outcome is readable in **one** session, which R20's slot-5-only
+session was not.
+
+**Where the contrast is, and where it is not.** Slot 4 sits 110–123 hPa
+(1.6–1.8 psi) under slot 5 from 3200 through 5400 rpm — the whole knock band —
+and converges to within 20 hPa by 6500 rpm:
+
+| rpm     | 3000 | 3200 | 3400 | 3800 | 4400 | 4700 | 5000 | 5400 | 5750 | 6000 | 6250 | 6500 |
+|---------|------|------|------|------|------|------|------|------|------|------|------|------|
+| slot 5  | 2699 | 2754 | 2809 | 2809 | 2809 | 2760 | 2712 | 2609 | 2519 | 2427 | 2335 | 2243 |
+| slot 4  | 2699 | 2699 | 2699 | 2699 | 2699 | 2645 | 2589 | 2503 | 2414 | 2350 | 2286 | 2223 |
+| Δ (hPa) | 0    | 55   | 110  | 110  | 110  | 116  | 123  | 106  | 105  | 77   | 49   | 20   |
+
+So R22 **does not** claim to test the 6000–6600 band, where the two octane arms
+are nearly the same map. That band went 6.7 → 22.1 ev/min on R20 and is still
+unresolved; it is R23's, not this revision's.
+
+### What was considered and rejected
+
+**Re-breakpointing the modifier grid's rpm axis** — still refused, for the reason
+recorded in § R21: the grid's rpm axis `0x3CE5A` and airmass axis `0x3CDBC` are
+shared by all 18 `IP_IGA_BAS_IVVT_VVL_PORT_L` — Basic ignition angle maps *and*
+all five slots' `Spark modifier` grids, 37 axis references each. Moving a
+breakpoint re-indexes the whole ignition calibration on every slot, the control
+included. Standing "do not".
+
+**Dropping slot 1's stock map** to free a slot. Not needed: moving slot 4's curve
+to slot 3 frees the intermediate slot, which is the near-duplicate of slot 2
+(2699 flat to 4400 rpm against conservative's 2659–2440) and the only genuinely
+redundant entry in the ladder. Spending slot 1 as well would have left ~24.5 psi
+as the least map in the car.
+
+**A larger boost step for slot 4** — e.g. slot 2's conservative curve, ~5.3 psi
+under slot 5 at 4400–5000. It would almost certainly run clean, but it throws
+away enough of the pull that the power comparison against slot 5 stops meaning
+anything. `OCTANE_BOOST_DELTA_MAX_HPA = 200` in the script encodes that as a
+design bound: past it, the reduced-boost arm is a different engine rather than a
+neighbouring calibration.
+
+**Raising the near-redline modifier in the same revision.** Still queued for R23,
+still gated on this session logging clean, for the reason § R21 gives.
+
+### Verification (run `R22_20260901-060746`)
+
+- `build()` reports **checksums CLEAN** (CAL_CRC, ECM3), **final-bin readback
+  PASS** (145 tables re-read off the saved bin and matched to the journal), and a
+  **raw-diff audit vs `Patched_259L_R20.bin`: CLEAN — 504 changed bytes, all
+  attributed, unexplained = 0**. The 504 reconcile exactly: 2 × 176 bytes for the
+  two swapped `PUT setpoint` grids (11 of 12 rpm columns differ — both curves
+  start at 2699 hPa at 3000 rpm — × 8 rows × 2 bytes each), 128 bytes for slot 1's
+  grid (the 8 rpm columns at and above 4400 × 8 rows × 2 bytes), 16 bytes for
+  slot 4's newly written `Spark modifier` grid (8 columns × 2 rows × 1 byte), 4
+  bytes for slot 5's `Spark modifier` (R21's cut), and 4 stored checksum bytes.
+- **Independent XDF decode of both bins** — 3814 base-XDF tables and 185
+  switch-patch tables, zero decode errors — finds **zero** changed tables in the
+  base XDF and exactly **five** in the switch-patch XDF: `0x7d41a` `PUT setpoint`
+  (slot 1, 64 cells), `0x7d59a` and `0x7d65a` `PUT setpoint` (slots 3 and 4, 88
+  cells each) and `0x7d21a` / `0x7d31a` `Spark modifier` (slots 4 and 5, 16 and 4
+  cells). The five tables with comparison PNGs are the same five, which is itself
+  the check.
+- **Slot-level permutation check**, decoded independently of the build: R22 slot
+  3's boost cap is byte-identical to R20 slot 4's; R22 slot 4's is byte-identical
+  to R20 slot 3's; slot 5's is unchanged from R20 and equal to slot 3's; slot 2 is
+  unchanged; slot 1 is byte-identical to R20's below 4400 rpm and to slot 2's at
+  4400 and above, and sits ≤ every other slot at every breakpoint; slot 4's grid
+  is ≤ slot 5's at **every** breakpoint; slot 4's `Spark modifier` is
+  byte-identical to R20's slot 5 grid (R20's timing, restored exactly); slots 1–3
+  hold the as-patched neutral `Spark modifier` and are byte-identical to R20.
+- **Determinism:** three independent runs produced byte-identical bins, SHA-256
+  `08372bdee7c1c6b7b0ca89c8f9da31515622080927c99439f5578e6965bb475e`. Only the
+  `R22_20260901-060746` run folder is kept; the earlier R22 folders — two more of
+  this build, and three of the pre-slot-1 build (SHA-256 `8635469a…`, 376 changed
+  bytes) — were deleted once superseded.
+- The `R20_REFERENCE_SHA256` gate at the top of `main()` refuses to build against
+  a reference bin whose hash is not the flashed R20's
+  (`8c0b4d18ea7491f7c0ea595805abfa2aae3d23b55697e640622a4d26bfe83990`).
+- **Script guards added for R22 specifically.** `_check_slot_ladder()` runs
+  before any write and proves the ladder is the claimed permutation: control and
+  full-boost arm carry the same aggressive curve, the mid arm carries the
+  intermediate one, the mid arm is at or below the full arm at every breakpoint,
+  the two actually differ, they differ by no more than the declared design bound,
+  and slot 1 is at or below every other slot everywhere. `_slot1_curve()` proves
+  the composed slot 1 curve is slot 2's above the threshold, the factory target
+  below it, and the lower of the two at every breakpoint. `_apply_r22_slot_timing()` proves the *relationship* between the arms,
+  which no single-slot check can see: slot 4 must restore R20's timing exactly,
+  slot 5 must differ from it in exactly the declared columns and never upward.
+  All the R20/R21 guards still run — positive, finite, storable offsets; axes
+  matching the ones the timing constants are written on; both octane slots
+  neutral going in; base maps and slots 1–3 unchanged after the write; delivered
+  timing ≤ +5.00 °CRK on both arms (both peak at +4.500° at 6500 rpm).
+- One note on reading the bin yourself: the patch's neutral `Spark modifier`
+  value decodes to 7.1 × 10⁻¹⁵ °CRK, not exact 0.0. An equality-to-zero test on
+  slots 1–3 will report a false difference; compare with a tolerance, or compare
+  against R20 byte for byte.
+
+### Human review and logging gate
+
+Review the five R20→R22 comparison plots. **They are the only five tables that
+may differ**: `PUT setpoint` `0x7d59a` and `0x7d65a` (slots 3 and 4 exchanging
+curves — each plot's delta panel should show the *other* slot's curve arriving,
+not a new shape), `PUT setpoint` `0x7d41a` (slot 1 — the delta panel must be zero
+at 3000–3800 rpm and negative everywhere above), and `Spark modifier` `0x7d21a`
+and `0x7d31a`. Slot 5's boost cap, slot 2, the nine base ignition maps, and every
+shared base table must show no change at all, or the control is not a control.
+
+`Tunes/MainTune/plot_r22_slot_boost.py` draws all five slot curves on one pair of
+axes, read off the candidate bin, and is the quickest way to see the ladder whole
+before flashing:
+`MainTune_out/R22_20260901-060746/compare_slots/R22 map slot boost caps.png`.
+
+**Before driving: confirm the slot mapping in the car.** The ladder changed
+positions. Verify by boost, not by memory — slot 3 must now pull ~26 psi and slot
+4 ~24.4 psi, and slot 1 must fall away above 4400 rpm rather than holding ~21.6
+psi to redline. If they read the other way round, stop; the flash did not take or
+the slot indexing is not what this revision assumes.
+
+**Log it as a three-arm session:**
+
+1. **One dosed tank.** 10–11 oz VP Octanium **Unleaded** per 10 US gallons,
+   mixed, before the session. Not 2855.
+2. **At least three pulls each on slots 3, 4, and 5, interleaved** — rotate
+   3 → 4 → 5 → 3 → …, do not run all of one arm and then the next. R20's whole
+   readability problem was a single-arm session; R22 has three arms and the same
+   failure mode is three times as easy to fall into.
+3. Full actual-3rd-gear WOT pulls to redline, **holding WOT into 4th** after the
+   upshift. The 4th-gear continuation is not optional — R20's second-deepest cut
+   was only visible there.
+4. **Per-cylinder knock-sensor channels in the logging list.**
+5. Log folder `Logs/MainTune_R22/`. The flashed bin is recorded in the CSV
+   header's last column; **also note the selected slot per pull**, because the
+   slot numbers no longer mean what they meant in earlier folders.
+
+What decides whether R22 worked:
+
+1. **Does slot 4 knock at 4500–5000 rpm?** This is the question. Clean → cylinder
+   filling is the binding variable, and boost-for-timing is a real trade.
+   Knocking → offset size binds, and R21's cut is the right response.
+2. **Does slot 5's 4500–5000 band come back down** toward the control's rate?
+   That is R21's own hypothesis, now finally measured against a same-session
+   control instead of cross-session against R19.
+3. **The 5000–5500 apex stays clean on both arms** at its unchanged +3.750 °CRK.
+   If it starts knocking, the load reading was wrong on both arms.
+4. **Power**, in-gear trimmed per the `Calc HP` gear-flip rule: slot 5 vs slot 4
+   vs slot 3 peak F=ma wheel hp in the same session. Slot 4 giving up little to
+   slot 5 would make the reduced-boost arm the better map outright.
+5. **Boost separation is real in the logs** — slot 4 should track ~110–123 hPa
+   under slots 3 and 5 across 3400–5400 rpm. If it does not, the arms are not
+   what this revision built and nothing above is interpretable.
+
+**Stop signals** — switch to **slot 3** (not slot 4) and end the session: retard
+deeper than −1.50 °CRK that does not recover, retard that ramps rather than
+decaying, two cylinders retarding in the same sample sustained, accumulated
+retard approaching the untouched `IP_IGA_MAX_KNK` — Maximum value for spark
+retard floor, or loss of lambda or fuel-pressure control.
+
+**Carried forward, unresolved.** `Tunes/MainTune/tune_code_review.md` P1 against
+the R19 intake-axis re-breakpoint is still open; R22 inherits that geometry
+unchanged and is still owed a part-throttle high-rpm log. The pre-existing
+3000–3500 rpm knock zone (43.2 ev/min on R19 with no modifier at all) and the
+6000–6600 band are both untouched here.
+
+Still **revision 22 — a starting point, not a finished calibration**. The script
 and build pipeline never flash an ECU.

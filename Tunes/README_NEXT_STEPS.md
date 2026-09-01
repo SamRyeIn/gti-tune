@@ -10,13 +10,66 @@ This file now lives at the `Tunes/` root and spans both project folders: it
 tracked `TuningBasicsGuide` (R00–R15) alone until R15, and continues into
 `MainTune` (R16 onward) — see `REV_LOG.md` for the project split.
 
-Current lineage tip: **R20 — built and verified, awaiting human review and a
-flash**. It turns map slot 5 into an octane-boosted timing map (slot 4's boost
-curve plus a per-slot `Spark modifier` advance) for a tank dosed with VP
-Octanium **Unleaded**, and is the first revision whose validation is a
-**within-session A/B** rather than a comparison against the previous session.
-Read `REV_LOG.md` § R20 and [[octane-booster-and-slot-5]] before selecting slot 5
-— the fuel constraint is part of the calibration.
+Current lineage tip: **R22 — built and verified, awaiting human review and a
+flash**. It reorders the map slot ladder by **fuel requirement** rather than by
+boost and adds a second octane arm, so the boost-versus-timing trade can be
+measured against a control in one session:
+
+| Slot | Boost                                         | Timing           | Fuel      | Role                                         |
+|------|-----------------------------------------------|------------------|-----------|----------------------------------------------|
+| 1    | ~21.6 psi to 3800 rpm, then slot 2's to ~17.2 | base             | pump 92   | low / bad tank                               |
+| 2    | conservative ~24.5                            | base             | pump 92   |                                              |
+| 3    | aggressive ~26.0                              | base             | pump 92   | **everyday map, in-drive fallback, control** |
+| 4    | mid ~24.4 psi                                 | R20 octane shape | **dosed** | reduced-**boost** arm                        |
+| 5    | aggressive ~26.0                              | R21 octane shape | **dosed** | reduced-**timing** arm                       |
+
+Slot 1 also stops being the factory curve above 4400 rpm — it takes slot 2's
+there and falls to ~17.2 psi at redline, so the safe map is now safest exactly
+where cylinder pressure is worst. Five tables move, all per-slot. Read `REV_LOG.md` § R22 before flashing, and log
+it as **interleaved slot 3 / 4 / 5 pulls on one dosed tank**.
+
+**The in-drive fallback is now slot 3, not slot 4.** Slot 4 is one of the two
+maps that needs the dose. And when reading any `Logs/` folder: before R22, slot 4
+means the aggressive pump-gas control; from R22 on it means the mid-boost octane
+map. Record the selected slot per session rather than inferring it.
+
+**R21 was built and verified but never flashed.** Its slot 5 timing is carried
+forward into R22 byte for byte; nothing about it was rejected. R22's byte audit
+is taken against the R20 bin, which is what the car actually holds.
+
+**R20 was flashed, logged, and reviewed** on 2026-08-31 (`Logs/BasicsGuide_R20/`,
+ten pulls). Its timing arrived as designed — the modifier lands in `Ign Avg`, not
+`Ign Table`, correcting what the R20 gate predicted — but all ten pulls were slot
+5, so there is no within-session control and R20 had to be scored cross-session
+against R19 with day and fuel as confounds. Knock roughly doubled (15.33 vs 8.63
+events per loaded minute) and went one step deeper (−2.25 vs −1.50 °CRK), all of
+it attributable to 4500–5000 rpm. Sam's octane-mixing hypothesis was tested and
+not supported (rank correlation of knock area with time +0.008).
+
+**Queued for R23, gated on R22 logging clean:**
+
+- **Raise near-redline timing.** 6000 rpm has room inside the +5.00 °CRK
+  delivered ceiling (base +1.875, so the modifier could reach +3.000). 6500 rpm
+  does not — R20/R21 already deliver +4.500 there and +1.500 modifier /
+  +4.875 delivered is the last storable step under the guard. Held out of R21
+  and R22 to keep each revision single-variable — and note R22's two octane
+  arms barely separate above 6000 rpm (20 hPa by 6500), so that band is
+  untested by R22 either way.
+- **Write the 1049.97 mg/stk row of the `Spark modifier` grid.** At 6000+ rpm
+  airmass runs ~1204 mg/stk, right at the 1200.01 breakpoint, so the grid
+  interpolates down toward the neutral row and only ~90% of the column value is
+  actually delivered at redline load.
+- **The pre-existing 3000–3500 rpm knock zone.** Highest event rate in either
+  session (43.2/min on R19 with no modifier), and where R20's two-cylinder
+  same-sample events sit. Not caused by the modifier, never addressed, and the
+  reason R20's AE6 gate failed as written.
+
+**Do not re-breakpoint the `Spark modifier` grid's axes.** Checked during R21:
+the rpm axis `0x3CE5A` and airmass axis `0x3CDBC` are each referenced by 37
+tables — all 18 `IP_IGA_BAS_IVVT_VVL_PORT_L` — Basic ignition angle maps plus all
+five slots' modifier grids. Moving a breakpoint re-indexes the whole ignition
+calibration on every slot, slot 1 (stock) and the control slot included.
+Re-confirmed as a standing "do not" during R22.
 
 Its predecessor **R19 was flashed, logged, and reviewed** on 2026-08-30 (see
 `Logs/BasicsGuide_R19/log_review.md`): it met all five of its measurements, but
