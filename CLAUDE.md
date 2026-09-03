@@ -96,8 +96,10 @@ Tuning is iterative, and each pass through the loop looks like this:
    previous revision's bin whose allowance is derived from the edit journal, so
    an undeclared change fails the build rather than passing quietly. Pass
    `reference_bin=` or that last gate does not run. (Pre-R13 revisions did this
-   by hand — see the `tune-bin-verification` memory.) Human review gate: Sam
-   visually reviews the report and PNGs before flashing.
+   by hand — see the `tune-bin-verification` memory.) Then build the revision's
+   **change-summary plot** — required for every revision, see the section below.
+   Human review gate: Sam visually reviews the report, the change-summary plot
+   and the `compare/` PNGs before flashing.
 3. **Flash** — human step. Sam flashes the bin to the car with the SimosTools
    Android app. Claude cannot do this.
 4. **Log** — human step. Sam drives (e.g. 3rd-gear WOT pulls), logs with
@@ -116,6 +118,54 @@ Tuning is iterative, and each pass through the loop looks like this:
 
 Every tune revision is "a starting point, not a finished calibration" — never
 declare a tune done from the bin alone; only logs validate it.
+
+## Every revision ships a change-summary plot
+
+**Required for every tune revision unless Sam says otherwise.** One PNG that
+shows everything the revision changes, on one page, so the pre-flash review is a
+single glance rather than a hunt through a dozen `compare/` PNGs and a claim
+about the tables that produce no PNG *because* they did not move.
+
+- **Script**: `Tunes/<Tune>/plot_r<NN>_changes.py`, alongside the revision
+  script. **Output**: `<Tune>_out/R<NN>_changes_summary.png`. Written in the same
+  Python/matplotlib tooling as the rest of the project — see
+  `Tunes/MainTune/plot_r23_changes.py` as the reference implementation. The PNG
+  lands under the gitignored `*_out/` tree like every other run artifact, so the
+  script is the record and the plot is regenerated on demand.
+- **Read every number off the two bins** — the previously flashed bin and the
+  new one — via `CalFile`, never retyped from the revision script. That makes
+  the plot an independent check rather than a restatement: if the figure and the
+  script disagree, the figure is right. Say so in the module docstring.
+
+What it must contain:
+
+1. **One panel per domain the revision touches** (fuelling, timing, boost, …),
+   each drawing the previous revision against the new one on the row or axis the
+   engine actually runs on. Say which row in the panel title, e.g. "1400 mg/stk
+   row", because a grid plotted on the wrong row can look unchanged.
+2. **The negative.** Draw the tables the revision claims it did *not* change,
+   both bins overplotted (thick for the old, dashed for the new), and put the
+   worst difference in the panel title. An unchanged table generates no
+   `compare/` PNG, so without this there is nothing in the review output that
+   makes "boost is untouched" checkable.
+3. **A slot-effect matrix whenever a change routes through a shared table.**
+   Writing a shared grid and taking it back off some slots with per-slot
+   modifiers means no single table shows what any one slot ends up running. A
+   small table — one row per map slot, one column per domain — is the only place
+   that appears. This is where a reviewer catches "slots 4 and 5 got the
+   enrichment too".
+4. **Before → after values annotated on the breakpoints that moved**, in physical
+   units. Group runs of identical annotations (`0.800 → 0.780, 5504-7008 rpm`)
+   rather than writing the same string over each column.
+5. **A title carrying the provenance and the verdict**: both bin filenames, the
+   number of tables that moved, the byte count, and the audit result.
+6. A **reference calibration** where one exists and is relevant (EQT Stage 2,
+   the stock bin), plotted as context so the size of the step is legible against
+   something other than itself.
+
+Conventions: bold axis labels, `grid on` plus minor gridlines on every axes,
+`matplotlib.use("Agg")`, shading to mark the breakpoints that moved, and a
+figure title stating what the reviewer is being asked to confirm.
 
 ## Safety — non-negotiable
 
