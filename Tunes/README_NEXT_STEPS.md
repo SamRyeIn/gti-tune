@@ -10,7 +10,16 @@ This file now lives at the `Tunes/` root and spans both project folders: it
 tracked `TuningBasicsGuide` (R00–R15) alone until R15, and continues into
 `MainTune` (R16 onward) — see `REV_LOG.md` for the project split.
 
-Current lineage tip: **R22 — flashed, logged and reviewed on 2026-09-01; the
+Current lineage tip: **R23 — built and verified 2026-09-03, awaiting human
+review and a flash.** It is the first revision aimed at making the everyday
+pump-92 map better rather than at running an experiment beside it: the lambda
+grid is enriched at 3008 rpm and 5504-7008 rpm as far as the fuel pump allows,
+slot 3 gains +0.750 °CRK at 3500 and 4000 rpm, and slots 1 and 2 are held at
+their prior lambda through the lineage's first use of the per-slot `Lambda
+modifier` — map slot lambda offset grids. **Boost is unchanged.** Six tables
+move, 68 bytes. Full rationale and the logging gate: `REV_LOG.md` § R23.
+
+Its predecessor **R22 was flashed, logged and reviewed on 2026-09-01; the
 three-slot octane experiment came back null** (`Logs/BasicsGuide_R22/log_review.md`).
 It reorders the map slot ladder by **fuel requirement** rather than by
 boost and adds a second octane slot, so the boost-versus-timing trade can be
@@ -50,7 +59,64 @@ events per loaded minute) and went one step deeper (−2.25 vs −1.50 °CRK), a
 it attributable to 4500–5000 rpm. Sam's octane-mixing hypothesis was tested and
 not supported (rank correlation of knock area with time +0.008).
 
-**Queued for R23 — requeued 2026-09-03, after the R22 logs were reviewed.**
+**R23 is built.** What it took from this queue, and what it left:
+
+- The richer-lambda item below is **partly spent**: R23 enriches 3000-3500 rpm
+  and 5504-7008 rpm, but the fuel pump caps the first at lambda 0.930 rather
+  than EQT's 0.870. The rest of that gap is the boost proposal immediately
+  below, which is the live R24 item.
+- The per-slot route it described is **built**: `simoscal` now binds the five
+  `Lambda modifier` — map slot lambda offset grids as `slot{N}_lambda_modifier`
+  and writes them through `tune.switchpatch.slot_lambda_map()`. R23 uses it to
+  hold slots 1 and 2 back, not to enrich one slot, because the grid's sign has
+  never been observed on this car — see `REV_LOG.md` § R23.
+- The **single-variable rule that used to sit here has been removed** at Sam's
+  direction (2026-09-03). R23 moves lambda and ignition together and relies on
+  their sitting in different rpm bands to stay attributable, which is recorded
+  as an accepted confound rather than hidden.
+
+**Queued for R24:**
+
+- **Trade ~1.3 psi of low-end boost for EQT's fuelling in the knock band.**
+  *This is the proposal R23 flagged and did not build.* The 3000-3500 rpm band
+  is the worst knock zone on the aggressive curve — 15.85 events per loaded
+  minute over 51 pump-92 logs, deepest −2.62 °CRK, and −4.50 °CRK on R22's
+  dosed control — and it commands lambda 0.922 against EQT Stage 2's 0.870.
+
+  R23 could only close a fifth of that gap because `HPFP Eff Vol` — high-pressure
+  fuel pump effective volume runs a median 89 % there and the pump saturates
+  before 0.870 arrives. `Logs/aggressive_slot_lineage/size_r23.py` sizes the way
+  out: reaching 0.870 inside a 98 % pump gate needs airmass down **3.2 %**, i.e.
+  the `PUT setpoint` — map slot 3 boost cap scaled by 0.968 in the band:
+
+  | rpm  | R22/R23 hPa | proposed hPa | delta   |
+  | ---- | ----------- | ------------ | ------- |
+  | 3000 | 2699        | 2611         | −1.27 psi |
+  | 3200 | 2754        | 2665         | −1.30 psi |
+  | 3400 | 2809        | 2718         | −1.32 psi |
+
+  Two effects pull the same way: less cylinder filling is less knock on its own,
+  and the fuel it frees buys the lambda that the EQT evidence says is worth more
+  than the timing. The cost is low-end torque on the everyday map, which is
+  exactly what the aggressive slot exists for — so this is a trade to take
+  deliberately, not a correction to apply. **Do not build it before the R23 logs
+  land**: if R23's small enrichment already moves the 3000-3500 knock rate, the
+  size of this trade changes.
+
+- **Then take 3008 rpm from 0.930 to 0.910.** Sized and pump-safe on its own
+  (p95 95.2 %, max 98.7 %); it was held out of R23 only because the wrong-sign
+  case for the never-yet-written `Lambda modifier` grids doubles the enrichment
+  on slots 1 and 2, and 0.910 doubled reaches 103 %. The R23 logs settle the
+  sign — see the gate in `REV_LOG.md` § R23 — and once they do, that constraint
+  is gone.
+
+- **4500-5000 rpm is still unaddressed.** The second knock zone: 8.99 events per
+  loaded minute, deepest −3.00 °CRK, at 1490 mg/stk. Lambda there is already
+  within 0.016 of EQT's, so fuelling has nothing to give, and the pump has no
+  headroom (median 93.2 %). That leaves boost or timing, and R18 already pulled
+  timing there once. Left alone by R23 deliberately.
+
+**Background — the evidence the R23 and R24 items rest on:**
 
 **Two timing items were dropped from this queue** — raising the 6000 rpm
 `Spark modifier` — map slot ignition offset grid toward +3.000 °CRK, and writing
@@ -64,8 +130,9 @@ future session establishes octane headroom that R22 could not. Full evidence:
 `Logs/BasicsGuide_R22/log_review.md` and `REV_LOG.md`
 § What the R22 logs actually said.
 
-- **Consider running a richer lambda to buy knock margin.** Now the lead item,
-  and the one queued change that *reduces* risk rather than adding it. Evidence is in
+- **The richer-lambda case.** Partly spent by R23 and the basis of the boost
+  proposal above; kept here because the argument is the load-bearing one.
+  Evidence is in
   `knowledge/eqt-s2-timing-reverse-engineering.md` § How EQT bought the timing:
   across three calibrations logged on this car, knock tracks fuelling, not
   timing. EQT Stage 2 ran λ 0.780 at WOT and knocked on 5.3 % of samples;
@@ -99,15 +166,15 @@ future session establishes octane headroom that R22 could not. Full evidence:
     overheating protection, `IP_LAMB_TUR_OHP_MIN` — Minimum lambda value for
     turbo charger overheating prevention.
 
-  **A per-slot route exists but is not yet wired up.** The switch patch carries
-  five `Lambda modifier` — map slot lambda offset grids (12×8, uids `0x7CB5A`,
-  `0x7CC1A`, `0x7CCDA`, `0x7CD9A`, `0x7CE5A`), one per slot, which would allow
-  enrichment to be tested against a control slot in a single session exactly the
-  way the `Spark modifier` experiments work. But `simoscal` registers only
-  `slot{N}_put_setpoint` and `slot{N}_spark_modifier` — the lambda grids have no
-  profile entry and no domain call, so this needs library support first. Writing
-  the base grid instead changes fuelling on **all five slots at once**, control
-  slot included, which costs the within-session comparison.
+  **The per-slot route is now wired up (R23).** The switch patch carries five
+  `Lambda modifier` — map slot lambda offset grids (12×8, uids `0x7CB5A`,
+  `0x7CC1A`, `0x7CCDA`, `0x7CD9A`, `0x7CE5A`), one per slot. `simoscal` binds
+  them as `slot{N}_lambda_modifier` and writes them through
+  `tune.switchpatch.slot_lambda_map()`, which bounds delivered lambda under both
+  sign conventions because the grid's sign has never been observed on this car.
+  Until a log settles that sign, use the grid only in the direction where being
+  wrong fails **rich** — which is what R23 does by enriching the base grid and
+  using the modifier to hold slots 1 and 2 back.
 
   **Gating constraint — pump capacity.** `HPFP Eff Vol` already runs 89.1 % at
   3000–3500 rpm (87.5 % median across WOT, 95 % at p95, touching 100 %). Going
@@ -119,8 +186,7 @@ future session establishes octane headroom that R22 could not. Full evidence:
   past that trades some torque for margin — EQT at 0.780 was deliberately richer
   than best power. And knock *rates* are not directly comparable between the
   Cobb-logged tunes and R22's SimosTools logs, since R22's own knock control was
-  modified from R19 onward; the **lambda** comparison is the clean one. Keep this
-  single-variable: do not combine it with any ignition change.
+  modified from R19 onward; the **lambda** comparison is the clean one.
 
 - **The pre-existing 3000–3500 rpm knock zone.** Highest event rate in either
   session (43.2/min on R19 with no modifier), and where R20's two-cylinder

@@ -52,6 +52,7 @@ the final review remain human-only steps.
 | R20      | `TUNE_MainTune_R20.py`     | R19 calibration + slot 5 stops being the valet map: it takes slot 4's boost curve (read off the R19 bin, not retyped) and gains its own `Spark modifier` — map slot 5 ignition offset of +1.125 to +3.750 °CRK across 3000–6500 rpm in the 1200/1400 mg/stk rows, for a VP Octanium Unleaded–dosed tank. Two tables move, both slot 5's. CAL-flash eligible after the R07 patch set is installed. |
 | R21      | `TUNE_MainTune_R21.py`     | R20 calibration + a cut to slot 5's `Spark modifier` — map slot 5 ignition offset from the R20 log evidence: the 4000 and 4500 rpm columns come down to +1.500 °CRK (−0.750 / −1.500) because 4500–5000 rpm ran 27.5 knock events per loaded minute against R19 slot 4's 4.2. The +3.750° apex at 5000 rpm and everything above it are held. Exactly one table moves, 4 cells. CAL-flash eligible after the R07 patch set is installed. **Built and verified, never flashed; superseded by R22.** |
 | R22      | `TUNE_MainTune_R22.py`     | R20 calibration + the map slot ladder reordered by **fuel requirement** instead of by boost, and a second octane slot. The aggressive ~26 psi curve moves from slot 4 down to slot 3 (read off the R20 bin, not retyped) and becomes the pump-gas everyday map, the in-drive fallback, and the A/B control; the intermediate ~24.4 psi curve moves up to slot 4 and gains R20's **uncut** `Spark modifier` — map slot 4 ignition offset; slot 5 keeps its ~26 psi curve and R21's **cut** offset. Slots 1–3 are pump-92 safe, slots 4–5 need the dosed tank. Three slots — control, reduced boost, reduced timing — testable in one session. Slot 1 also stops being the factory curve above 4400 rpm, taking slot 2's there and falling to ~17.2 psi at redline. Five tables move, all per-slot. CAL-flash eligible after the R07 patch set is installed. |
+| R23      | `TUNE_MainTune_R23.py`     | R22 calibration + the first revision aimed at making the everyday pump-92 map **better** rather than at running an experiment beside it. Sized against every pull this car has done on the aggressive ~26 psi curve (51 plain-92 logs across R09–R19 plus R22's four dosed control pulls, pooled by `Logs/aggressive_slot_lineage/` on the logged boost cap rather than the slot number). Three changes: `IP_LAMB_BAS_HPDI[1]` — Basic HPDI lambda setpoint grid and its two twins are enriched at 3008 rpm (0.980/0.950 → 0.930) and 5504–7008 rpm (0.800 → 0.780) on the two loaded rows; slot 3's `Spark modifier` — map slot ignition offset takes **+0.750 °CRK at 3500 and 4000 rpm**, the band this curve has never knocked in; and slots 1 and 2 get the lineage's **first use of the per-slot `Lambda modifier` — map slot lambda offset grids**, holding them at their prior lambda so the enrichment reaches slots 3–5 only. All five `PUT setpoint` — map slot boost caps are read off the R22 bin and written back unchanged. Six tables move; 68 bytes. CAL-flash eligible after the R07 patch set is installed. |
 
 ## R00 — Initial revision
 
@@ -2546,3 +2547,217 @@ experiment band.
 Still **revision 22 — a starting point, not a finished calibration**. The script
 and build pipeline never flash an ECU. The logs above are the first evidence
 against it, and they do not close it out.
+
+
+## R23 — optimise the pump-92 aggressive slot: fuel the knock, spend the clean band
+
+R23 is the first revision in this lineage whose purpose is to make **map slot 3**
+— the aggressive ~26 psi curve, the everyday pump-92 map and the in-drive
+fallback — a better calibration, rather than to place an experiment beside it.
+R20 through R22 were all experiments, and R22's came back null.
+
+### The population it is sized against
+
+The slot number carrying the aggressive curve has moved three times: it was slot
+3 when R09 first cut the 26 psi shelf, slot 4 from R14, and slot 3 again from
+R22. So `Logs/aggressive_slot_lineage/` pools by the **curve** instead, which is
+logged directly — `PUT SP` — Pressure up throttle setpoint is the slot's own cap
+read back out of the ECU, and the aggressive one peaks at 2806–2809 hPa against
+2699 for every other slot this car has run. Above 3400 rpm one number separates
+them with ~100 hPa of margin. The five `Spark modifier` grids were neutral until
+R20 wrote one, so every aggressive-curve pull up to R19 is base timing by
+construction; from R20 the offset is reconstructed per pull.
+
+That yields **51 plain-92 logs (372.8 s loaded WOT) across R09, R11, R14, R15,
+R17, R18 and R19, plus R22's four dosed control pulls** — by a wide margin the
+largest evidence base any revision here has been sized against. Event
+definitions are R19's, unchanged, so the rates below are comparable with every
+prior review.
+
+| rpm band  | events/min | 95 % CI       | deepest | median airmass | `Lambda SP` | EQT S2 | `HPFP Eff Vol` median |
+| --------- | ---------- | ------------- | ------- | -------------- | ----------- | ------ | --------------------- |
+| 3000–3500 | **15.85**  | [6.84, 31.23] | −2.62   | 1382 mg/stk    | 0.922       | 0.870  | 88.9 %                |
+| 3500–4000 | **0.00**   | [0.00, 5.44]  | —       | —              | 0.880       | 0.820  | 92.7 %                |
+| 4000–4500 | 1.21       | [0.03, 6.72]  | −1.50   | 1559 mg/stk    | 0.848       | 0.800  | 94.8 %                |
+| 4500–5000 | **8.99**   | [4.31, 16.54] | −3.00   | 1490 mg/stk    | 0.806       | 0.790  | 93.2 %                |
+| 5000–5500 | 3.31       | [0.68, 9.68]  | −3.00   | 1429 mg/stk    | 0.800       | 0.780  | 86.2 %                |
+| 5500–6000 | 3.15       | [0.65, 9.21]  | −3.00   | 1366 mg/stk    | 0.800       | 0.790  | 75.6 %                |
+| 6000–6600 | 2.65       | [0.32, 9.56]  | −3.00   | 1203 mg/stk    | 0.800       | 0.780  | 69.3 %                |
+
+Two things fall straight out of that table. The knock is in **two places**, not
+spread across the range — and 3500–4500 rpm, between them, is close to silent:
+one event in 90 loaded seconds across seven sessions. And the commanded lambda
+is leaner than EQT Stage 2's everywhere, with the gap **largest exactly where
+the knock is worst** (+0.052 at 3000–3500). So: fuel the band that knocks, and
+spend the band that does not.
+
+### Fuelling, and why it stops short of EQT's number
+
+On the two loaded rows (1200.01 and 1389.00 mg/stk):
+
+| rpm     | R22           | R23   | why                                                     |
+| ------- | ------------- | ----- | ------------------------------------------------------- |
+| 3008    | 0.980 / 0.950 | 0.930 | the worst knock band; every event in it is 3026–3156 rpm |
+| 5504    | 0.800         | 0.780 | EQT's own top-end figure; the pump has 25–30 points free |
+| 5984    | 0.800         | 0.780 |                                                          |
+| 6496    | 0.800         | 0.780 |                                                          |
+| 7008    | 0.800         | 0.780 | so the grid does not lean out again inside the rev range |
+
+**It does not reach EQT's 0.870 at 3008, and the limit is the fuel pump.**
+`Logs/aggressive_slot_lineage/size_r23.py` replays the ECU's own lambda lookup
+over 8497 loaded samples — median absolute error **0.00103 lambda**, so the
+replay is the calibration and not a model of it — and scales the logged `HPFP
+Eff Vol` per sample by the fuel ratio each candidate needs:
+
+| candidate at 3008 | band lambda* | fuel  | HPFP p95 | max   | doubled p95 | doubled max |
+| ----------------- | ----------- | ----- | -------- | ----- | ----------- | ----------- |
+| as-is (R22)       | 0.9268      | —     | 93.5     | 97.2  | 93.5        | 97.2        |
+| **0.930 (R23)**   | **0.9161**  | +0.8% | **94.2** | 97.7  | 95.3        | 98.8        |
+| 0.910             | 0.9069      | +1.5% | 95.2     | 98.7  | 98.2        | 103.1       |
+| 0.900             | 0.9010      | +1.8% | 95.8     | 99.8  | 99.8        | 105.4       |
+| 0.870 (EQT)       | 0.8941      | +2.8% | 98.2     | 103.1 | 105.5       | 113.3       |
+
+\* on the grid's own basis. The **logged** commanded lambda in that band is
+0.9219 and R23 takes it to 0.9129; the grid reads 0.9268 → 0.9161. See the
+residual note below — the difference does not matter here because every figure
+in this table is a *ratio*, and a ratio cancels it.
+
+Past ~100 % the pump is on its stop: enrichment stops arriving, rail pressure
+falls short, and the mixture goes lean **regardless of what is commanded** —
+which is the failure the enrichment exists to avoid. The "doubled" columns are
+the wrong-sign case for the `Lambda modifier` grids below, and they are what
+took the shipped value from 0.910 to 0.930. Once the R23 logs settle the
+modifier's sign, 0.910 is the next step and the doubled column stops applying.
+
+**A residual between the grid and the log, found while checking the evidence
+figure.** Replaying `IP_LAMB_BAS_HPDI[1]` reproduces the logged `Lambda SP` to a
+median 0.001 lambda over the whole population, but not evenly: at **4500-5000
+rpm the logged command runs 0.021 richer than the base grid alone asks for**,
+and 0.007 richer at 5000-5500. Three candidate explanations were tested and all
+three are out. It is not the airmass axis running off its 1389 mg/stk top
+breakpoint — 61 % of loaded samples do exceed it, and clamping beats
+extrapolating by an order of magnitude there (median absolute error 0.00103
+against 0.00830), which incidentally settles a question `slot_spark_map`'s
+flat-top rule has been carefully working around since R20: **this ECU clamps.**
+It is not the full-load enrichment maps `IP_LAMB_FL_SP` / `IP_LAMB_FL_SP_TIA`,
+which this calibration holds at 1.000 everywhere. And it is not the
+minimum-lambda floors, which cap how rich the command may go, not how rich it
+must be. Some other path enriches those two bands and it is not yet identified.
+
+Nothing in R23 depends on the answer: every figure it is sized on is a ratio
+between two lookups of the same grid, which cancels the residual, and the band
+R23 enriches has a residual of −0.001. But it does mean **the real gap to EQT at
+4500-5000 is 0.016 rather than the 0.041 the grid implies**, which strengthens
+rather than weakens the decision to leave that band's fuelling alone. Worth
+identifying before any future revision tries to fuel it.
+
+**Getting the rest needs less air, not more fuel.** Reaching 0.870 in the band
+inside a 98 % pump gate needs airmass down 3.2 %, i.e. the boost cap down about
+**1.3 psi at 3000–3400 rpm**. That is a real trade against low-end torque on the
+everyday map, it is sized and reproducible in `size_r23.py`, and it is
+deliberately **not** in this revision — see `README_NEXT_STEPS.md`.
+
+### Timing
+
+Slot 3's `Spark modifier` — map slot ignition offset, neutral since the patch
+went on, takes **+0.750 °CRK at 3500 and 4000 rpm** on the two loaded airmass
+rows, and nothing anywhere else:
+
+```
+rpm            3000    3500    4000    4500    5000    5500    6000    6500
+base          -7.500  -6.750  -4.500  -3.750  -2.250  +0.750  +1.875  +3.375
+slot 3 mod       -    +0.750  +0.750     -       -       -       -       -
+slot 3 dlv    -7.500  -6.000  -3.750  -3.750  -2.250  +0.750  +1.875  +3.375
+```
+
+Those two columns cover the only band this curve has never knocked in. EQT runs
+3.75–5.63 °CRK more timing in the same cells, so the headroom is not
+speculative — but that is a different box code, and +0.750 is two encoding
+steps. **Both knock bands are left alone**: 3000–3500 gets fuel and no timing,
+4500–5000 gets neither.
+
+### The first use of the `Lambda modifier` grids, and why it is shaped this way
+
+The base lambda grid is shared by all five slots, so enriching it enriches all
+five. The patch provides five `Lambda modifier` — map slot lambda offset grids
+(12 × 8, uids `0x7CB5A`–`0x7CE5A`, on the base lambda grid's own axes) for
+exactly this case, and R23 is the first revision in the lineage to write one.
+`simoscal` gained `slot{N}_lambda_modifier` and
+`tune.switchpatch.slot_lambda_map()` for it.
+
+**Additivity is established; the sign is not.** The patch ships every grid at a
+decoded 0.00, which a replacement setpoint could not be — every slot would
+command lambda zero — and a multiplier could not be, since neutral would have to
+be 1.0. That is the same proof the `Spark modifier` grid rests on. But the spark
+grid's *sign* was measured (R20 wrote +1.125 to +3.750 °CRK and the R20 and R22
+logs show exactly that arriving in `Ign Avg`), and no revision has ever written a
+lambda cell. So R23 routes around the question instead of betting on it:
+
+- the enrichment goes into the **base** grid, a path logged since R00;
+- the modifier is used only to take it back off **slots 1 and 2** — the bad-tank
+  and conservative maps, the lowest boost in the ladder and the most pump
+  headroom — as a **positive** (leaner, on the inferred convention) offset;
+- **slot 3 carries a neutral grid**, so the map this revision is about is not
+  exposed to the question at all.
+
+Every way the modifier can be wrong is therefore a rich failure on a low-demand
+map: wrong sign — slots 1 and 2 richer still; inert — all five slots run the
+enrichment, which is what slot 3 is getting deliberately; correct — only slots 1
+and 2 are held back. `slot_lambda_map` enforces the discipline structurally
+rather than trusting the script: it bounds **delivered** lambda (base + offset)
+under *both* sign conventions and refuses any write that would be unsafe either
+way. R23's bound is [0.755, 0.955].
+
+### What was built, and what a human must check
+
+`build()` reports **68 changed bytes vs the R22 bin, all attributed, unexplained
+= 0** — 64 journaled edits and 4 stored-checksum bytes. Exactly six tables move:
+
+- `IP_LAMB_BAS[1]`, `IP_LAMB_BAS_HPDI[1]` and `IP_LAMB_BAS_MPI[1]` — the three
+  basic lambda setpoint grids, kept identical as every revision since R00 has
+  kept them (`Fuel Split MPI` reads 0.000 at WOT, so the HPDI grid is the one
+  that fuels a pull);
+- `Lambda modifier` — map slot lambda offset for **slots 1 and 2**;
+- `Spark modifier` — map slot ignition offset for **slot 3**.
+
+All five `PUT setpoint` — map slot boost caps, the nine
+`IP_IGA_BAS_IVVT_VVL_PORT_L[STND][i][e]` — Basic ignition angle maps, the knock
+fast-loop tables, the wastegate feedforward and slots 4 and 5's `Spark modifier`
+grids must show **no change at all**. Anything else in the diff is a bug.
+
+One ordering trap worth recording: `apply_basics_sop()` writes
+`IP_LAMB_BAS_HPDI[1]` and its MPI twin from the guide's own literal table, so
+R23's enrichment has to be laid over them *after* the SOP runs. Written before
+it, the SOP silently puts the guide values back and the revision ships with only
+`IP_LAMB_BAS[1]` — the grid that is inert at WOT — changed.
+
+### The logging gate
+
+Log it as **plain 92, no dose**, 3rd-gear WOT pulls on slot 3, and read four
+things:
+
+1. **3000–3500 rpm knock rate** against the 15.85/min baseline above. This is
+   what the enrichment is for. The band's samples are few per session, so expect
+   a wide interval and pool across pulls.
+2. **3500–4500 rpm knock rate** against 0.00 and 1.21/min. This is what the
+   +0.750 °CRK costs. A rise here is the one place the two changes are hard to
+   separate, since the 3008 lambda column still carries weight at 3500 rpm.
+3. **`HPFP Eff Vol` at 3000–3500 rpm**, against a predicted median 90.0 %, p95
+   94.2 %, max 97.7 %. If it runs materially above that, the enrichment is
+   costing more pump than the replay predicted and the next step down in lambda
+   is off the table until that is understood.
+4. **The `Lambda modifier` sign — a question no log has ever answered.** Take
+   one pull on slot 1 or 2 and compare its `Lambda SP` at 3000–3500 rpm loaded
+   WOT against slot 3's. Differ → the grid works and its sign is the inferred
+   one. Same → the grid is inert and all five slots are running the enrichment.
+   Both outcomes are safe; both are worth knowing, and the answer unlocks the
+   per-slot fuelling experiments the ladder cannot currently run.
+
+Also still open from R22, and untouched here: the **−4.50 °CRK cylinder-4 event
+at 3156 rpm** and the clustering of every 3000–3500 rpm event at 3026–3156 rpm
+against a valve-lift 1 → 0 transition at 3052–3104 rpm. R23 enriches that zone,
+which is orthogonal to the transition mechanism, so these logs test the fuelling
+hypothesis without muddying it.
+
+Still **revision 23 — a starting point, not a finished calibration**. The script
+and build pipeline never flash an ECU.
