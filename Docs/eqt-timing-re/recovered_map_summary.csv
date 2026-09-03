@@ -1,0 +1,3 @@
+map,symbol,coverage_pct,n_cells_constrained,delta_min,delta_max,delta_mean
+VVL0_STND,IP_IGA_BAS_IVVT_VVL_PORT_L[STND][0][0],22.7,58,-3.75,6.75,1.009
+VVL1_LFT_1,IP_IGA_BAS_IVVT_VVL_PORT_L[LFT_1][0][0],9.4,24,-0.75,5.25,2.797

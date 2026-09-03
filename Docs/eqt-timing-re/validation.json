@@ -1,0 +1,31 @@
+{
+ "regime": "in boost (relmap > 0)",
+ "cams": "None",
+ "n_maps": 1,
+ "rmse_holdout_all": 0.4779983516154851,
+ "rmse_holdout_constrained": 0.4113517720883717,
+ "mae_holdout": 0.28727967745168836,
+ "rmse_target": 0.75,
+ "lsb_deg": 0.375,
+ "n_holdout": 14319,
+ "n_holdout_constrained": 13550,
+ "n_train": 28792,
+ "n_regime": 43111,
+ "n_all_logs": 111254,
+ "min_cell_weight": 40.0,
+ "grid_coverage_vvl0_pct": 22.7,
+ "grid_coverage_vvl1_pct": 9.4,
+ "n_cells_vvl0": 58,
+ "n_cells_vvl1": 24,
+ "holdout_sessions": [
+  "Documents/Cars/GTI/Cobb/Logs/Track/20220920 Ridge/20220920_Ridge_Session3.csv",
+  "Documents/Cars/GTI/Cobb/Logs/20220830_EQTS2_1.csv",
+  "Documents/Cars/GTI/Cobb/Logs/20220522_EQTS2_3Gear1.csv"
+ ],
+ "node_check_vvl0": {
+  "n_nodes": 41,
+  "n_within_1_lsb": 38,
+  "rmse": 0.7257,
+  "max_abs_error": 4.13
+ }
+}
