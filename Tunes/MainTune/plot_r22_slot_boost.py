@@ -16,8 +16,8 @@ Two panels, because they answer two different questions:
 
 * the ladder — all five slots, coloured by whether the slot is safe on pump 92
   or requires the VP Octanium dose;
-* the experiment — how far the reduced-boost arm (slot 4) sits under the
-  reduced-timing arm (slot 5), which is the only difference between them
+* the experiment — how far the reduced-boost slot (slot 4) sits under the
+  reduced-timing slot (slot 5), which is the only difference between them
   besides two columns of ignition timing.
 
 Run from anywhere:
@@ -62,10 +62,10 @@ SLOT_STYLE = {
     2: ("slot 2 — conservative · pump 92", "tab:cyan", "-", 1.6, 2),
     3: (f"slot {CONTROL_SLOT} — aggressive · pump 92 · CONTROL + fallback",
         "tab:blue", "-", 2.6, 3),
-    4: (f"slot {MID_BOOSTER_SLOT} — mid + R20 timing · DOSED · reduced-boost arm",
+    4: (f"slot {MID_BOOSTER_SLOT} — mid + R20 timing · DOSED · reduced-boost slot",
         "tab:orange", "-", 2.6, 4),
     5: (f"slot {BOOSTER_SLOT} — aggressive + R21 timing · DOSED · "
-        "reduced-timing arm (same curve as slot 3)",
+        "reduced-timing slot (same curve as slot 3)",
         "tab:red", "--", 2.2, 5),
 }
 
@@ -111,7 +111,7 @@ def _plot(rpm: np.ndarray, curves: dict[int, np.ndarray]) -> Path:
     )
 
     # -- the ladder ---------------------------------------------------------- #
-    # Shade the gap between the two octane arms first, so it reads as the
+    # Shade the gap between the two octane slots first, so it reads as the
     # background the curves sit on rather than another series.
     top.fill_between(
         rpm, psi_from_hpa(curves[MID_BOOSTER_SLOT]),

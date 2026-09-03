@@ -155,6 +155,18 @@ The description comes from the XDF `title` (or the tuning guide when clearer). I
 the plain-English meaning of an ID is genuinely unknown, say so explicitly rather
 than dropping the description.
 
+## Call them map slots — never "arms"
+
+A selectable map on the switch patch is a **map slot** (slot 1 … slot 5). Say
+"slot 4", "the octane slots", "the aggressive slot". Do **not** call them "arms",
+"the reduced-boost arm", "the control arm", or "test arms" — not in prose, plots,
+reports, commit messages, REV_LOG entries, code comments, or chat.
+
+`Tunes/REV_LOG.md` and `Tunes/README_NEXT_STEPS.md` were swept on 2026-09-01.
+`Tunes/MainTune/TUNE_MainTune_R22.py` still says "arm" throughout: it is a frozen
+revision script that produced a shipped bin, so its wording is left alone for
+traceability. Do not copy it forward — R23 onward says "slot".
+
 ## Log gear indexing depends on the channel header
 
 The gear offset in a SimosTools log is determined by the CSV column header:
