@@ -53,6 +53,7 @@ the final review remain human-only steps.
 | R21      | `TUNE_MainTune_R21.py`     | R20 calibration + a cut to slot 5's `Spark modifier` — map slot 5 ignition offset from the R20 log evidence: the 4000 and 4500 rpm columns come down to +1.500 °CRK (−0.750 / −1.500) because 4500–5000 rpm ran 27.5 knock events per loaded minute against R19 slot 4's 4.2. The +3.750° apex at 5000 rpm and everything above it are held. Exactly one table moves, 4 cells. CAL-flash eligible after the R07 patch set is installed. **Built and verified, never flashed; superseded by R22.** |
 | R22      | `TUNE_MainTune_R22.py`     | R20 calibration + the map slot ladder reordered by **fuel requirement** instead of by boost, and a second octane slot. The aggressive ~26 psi curve moves from slot 4 down to slot 3 (read off the R20 bin, not retyped) and becomes the pump-gas everyday map, the in-drive fallback, and the A/B control; the intermediate ~24.4 psi curve moves up to slot 4 and gains R20's **uncut** `Spark modifier` — map slot 4 ignition offset; slot 5 keeps its ~26 psi curve and R21's **cut** offset. Slots 1–3 are pump-92 safe, slots 4–5 need the dosed tank. Three slots — control, reduced boost, reduced timing — testable in one session. Slot 1 also stops being the factory curve above 4400 rpm, taking slot 2's there and falling to ~17.2 psi at redline. Five tables move, all per-slot. CAL-flash eligible after the R07 patch set is installed. |
 | R23      | `TUNE_MainTune_R23.py`     | R22 calibration + the first revision aimed at making the everyday pump-92 map **better** rather than at running an experiment beside it. Sized against every pull this car has done on the aggressive ~26 psi curve (51 plain-92 logs across R09–R19 plus R22's four dosed control pulls, pooled by `Logs/aggressive_slot_lineage/` on the logged boost cap rather than the slot number). Three changes: `IP_LAMB_BAS_HPDI[1]` — Basic HPDI lambda setpoint grid and its two twins are enriched at 3008 rpm (0.980/0.950 → 0.930) and 5504–7008 rpm (0.800 → 0.780) on the two loaded rows; slot 3's `Spark modifier` — map slot ignition offset takes **+0.750 °CRK at 3500 and 4000 rpm**, the band this curve has never knocked in; and slots 1 and 2 get the lineage's **first use of the per-slot `Lambda modifier` — map slot lambda offset grids**, holding them at their prior lambda so the enrichment reaches slots 3–5 only. All five `PUT setpoint` — map slot boost caps are read off the R22 bin and written back unchanged. Six tables move; 68 bytes. CAL-flash eligible after the R07 patch set is installed. |
+| R24      | `TUNE_MainTune_R24.py`     | R23 calibration + **map slot 2 is rebuilt as the low-torque map**, the first slot in this lineage shaped for a powerband rather than for a boost number. Through R23 it was a "conservative ~24.5 psi" curve — a scaled-down copy of the everyday map with no character of its own. Power goes as airmass x rpm, so a powerband linear in rpm is exactly a **constant airmass**; the whole calibration is one number, a flat **1200 mg/stk**, plus the measured volumetric efficiency that turns it into a cap. Peak power moves **5500 -> 6250 rpm** for **-2.6 %**, mid-range torque comes down **22 %**, and power against rpm fits a straight line at R^2 0.998 against the aggressive curve's 0.815. Above ~6150 rpm the cap is clamped at slot 3's curve read off the R23 bin, because holding the target there would need boost this car has never been logged running — and that clamp is what lands the peak at 6000. Slot 2 also leaves R23's lambda hold: it now runs slot 3's boost at the top, so its `Lambda modifier` — map slot lambda offset returns to the patch's neutral 0.00 and it takes the enrichment. **The ladder stops being monotonic in boost** and the "slot 1 is lowest everywhere" invariant carried since R14 is retired, replaced by three narrower ones. It also **finishes R23's top-end enrichment**: R23 wrote lambda 0.780 at 5504-7008 rpm on the 1200.01 and 1389.00 mg/stk rows, but WOT filling falls to 1176 mg/stk at 6250 rpm and 1089 at 6500 — below the 1200.01 breakpoint — so the command came out 0.786 and 0.801 instead, on every slot. Writing the same 0.780 onto the 1100.01 row closes it. Five tables move; 222 bytes. CAL-flash eligible after the R07 patch set is installed. |
 
 ## R00 — Initial revision
 
@@ -2761,3 +2762,219 @@ hypothesis without muddying it.
 
 Still **revision 23 — a starting point, not a finished calibration**. The script
 and build pipeline never flash an ECU.
+
+
+## R24 — map slot 2 becomes the low-torque map: flat airmass, linear power, peak at 6250 rpm
+
+R24 is the first revision in this lineage that starts from a **powerband shape**
+rather than from a boost number or a knock finding. Sam asked for a low-torque
+map with a linear powerband peaking around 6000 rpm. Map slot 2 is where it
+goes: through R23 it carried a "conservative ~24.5 psi" curve that was a
+scaled-down copy of the everyday map, the most redundant slot in the ladder, and
+pump-92 safe so it needs no dosed tank.
+
+### The shape is not a choice, it is arithmetic
+
+Torque on this engine tracks airmass per stroke, so power goes as
+`airmass x rpm`. Ask for a powerband **linear in rpm** and you have asked, exactly
+and with no freedom left, for a **constant airmass** across the range. The power
+peak then lands at the highest rpm the turbo can still hold that airmass at.
+
+So the entire calibration is one number — the airmass to hold — plus one
+measurement: how much boost this engine needs to make it at each rpm. That
+measurement is volumetric efficiency in the directly useful form, mg of air per
+stroke per kPa of manifold pressure, taken from the same 55-log aggressive-curve
+population R23 was sized against (`Logs/aggressive_slot_lineage/`) using only
+samples where the boost cap was **binding**, so spool transients do not
+contaminate it. `size_r24_linear.py` inverts it: `cap = target / VE(rpm)`.
+
+Sam chose **1200 mg/stk** from a sweep:
+
+| target mg/stk | peak power at | peak power | torque at 4100 rpm | linearity R^2 |
+| ------------- | ------------- | ---------- | ------------------ | ------------- |
+| 1400          | ~5500 rpm     | ~unchanged | -9 %               | rolls off early, peak does not move |
+| 1300          | 5900 rpm      | -1.2 %     | -15.5 %            | 0.9970        |
+| **1200**      | **6250 rpm**  | **-2.6 %** | **-22.0 %**        | **0.9993**    |
+
+Peak power barely moves because the entire cut is **below 5900 rpm**, which is
+not where peak power is. The aggressive curve over the same span fits a straight
+line at R^2 0.815; this one at 0.999.
+
+### The cap, and why it is a bowl rather than a shelf
+
+| rpm  | VE mg/kPa | need hPa | slot 3 | CAP  | psi g | R23 slot 2 | airmass |
+| ---- | --------- | -------- | ------ | ---- | ----- | ---------- | ------- |
+| 3000 | 5.157     | 2327     | 2699   | 2327 | 19.05 | 24.45      | 1200    |
+| 3400 | 5.230     | 2294     | 2809   | 2294 | 18.59 | 23.29      | 1200    |
+| 3800 | 5.408     | 2219     | 2809   | 2219 | 17.49 | 22.13      | 1200    |
+| 4400 | 5.462     | 2197     | 2809   | 2197 | 17.17 | 20.69      | 1200    |
+| 5000 | 5.535     | 2168     | 2712   | 2168 | 16.75 | 19.39      | 1200    |
+| 5400 | 5.476     | 2191     | 2609   | 2191 | 17.09 | 18.99      | 1200    |
+| 5750 | 5.241     | 2290     | 2519   | 2290 | 18.52 | 18.65      | 1200    |
+| 6000 | 5.117     | 2345     | 2427   | 2345 | 19.32 | 18.17      | 1200    |
+| 6250 | 5.033     | 2384     | 2335   | 2335 | 19.17 | 17.68      | 1175 \* |
+| 6500 | 4.855     | 2472     | 2243   | 2243 | 17.84 | 17.20      | 1089 \* |
+
+\* clamped at slot 3.
+
+Nobody drew this curve. It dips in the middle because **VE peaks near 5000 rpm**,
+so that is where the least boost is needed to make a given airmass — and it
+rises at both ends for the same reason in reverse. A calibration written by eye
+would almost certainly have sloped it monotonically and been wrong in the middle.
+
+### The clamp is what puts the peak at 6000
+
+Above ~6150 rpm, holding 1200 mg/stk would need **more boost than this car has
+ever been logged running** — VE falls away faster than the target needs, and by
+6500 rpm the requirement is 2472 hPa against the aggressive curve's 2243. Asking
+for that is asking the turbo for an unlogged operating point, on the map that
+exists to be the gentle one.
+
+So the cap is clamped, cell by cell, at slot 3's curve **read off the R23 bin**
+rather than against the declared constant — the bound is then true of the bytes,
+not of the arithmetic, and quantisation in the stored curve cannot open a gap.
+Airmass therefore holds flat to ~6100 rpm and then falls with slot 3's taper,
+and that roll-off is precisely what lands the power peak at 6250 rpm. The
+constraint and the goal turned out to be the same thing.
+
+### Slot 2 leaves the lambda hold
+
+A consequence of the clamp: above ~6150 rpm slot 2 now runs **slot 3's boost**.
+R23 held slots 1 and 2 at their prior, leaner 0.800 lambda there — which is
+exactly the top-end condition R23 enriched slot 3 to fix. Leaving the hold in
+place would hand the new map slot 3's boost on the old fuelling.
+
+So slot 2's `Lambda modifier` — map slot lambda offset grid is declared back to
+the patch's neutral 0.00 and it takes the base grid's enrichment with slots 3, 4
+and 5. **Declared, not omitted**: on a freshly patched bin the write stages no
+bytes, but it declares the table's extent, which is what lets the raw-diff audit
+attribute the difference against the R23 bin (where those cells are non-zero)
+instead of calling it unexplained. An omitted write would fail the build.
+
+Slot 1 stays held, so R23's unresolved question — which way a positive offset on
+that never-yet-observed grid moves the mixture — keeps its reference, and keeps
+it on the lowest-boost map in the ladder, where a wrong sign is a rich failure
+with the most fuel-pump headroom behind it.
+
+### It also finishes a job R23 started
+
+R23 enriched 5504-7008 rpm to lambda 0.780 on the 1200.01 and 1389.00 mg/stk
+rows, reasoning that loaded WOT runs 1200-1600 mg/stk. That holds to about 6100
+rpm and fails above it. The engine is out of breath at the top, and WOT filling
+on the aggressive curve falls to **1176 mg/stk at 6250 rpm and 1089 at 6500** —
+both *below* the 1200.01 breakpoint — so the lookup interpolates down toward the
+1100.01 row, which R22 left at 0.810/0.800. The commanded value came out **0.786
+at 6250 rpm and 0.801 at 6500**, not the 0.780 R23 intended.
+
+So R23's top-end enrichment faded out over the last 400 rpm of the rev range, on
+every slot, in the band carrying three of the lineage's −3.00 °CRK events. It was
+found while answering a question about whether slot 2 and slot 3 run the same
+lambda — they do above 5000 rpm, and both were drifting lean at the top together.
+
+R24 writes the same 0.780 onto the 1100.01 row in the same four columns:
+
+| row         | 5504  | 5984  | 6496  | 7008  |
+| ----------- | ----- | ----- | ----- | ----- |
+| 1100.01 R23 | 0.830 | 0.810 | 0.800 | 0.800 |
+| 1100.01 R24 | 0.780 | 0.780 | 0.780 | 0.780 |
+
+Commanded lambda above 6100 rpm, computed from the two bins by replaying the
+lookup over each slot's own predicted airmass:
+
+| slot                  | R23         | R24         |
+| --------------------- | ----------- | ----------- |
+| 3 — everyday map      | 0.780–0.801 | 0.780–0.782 |
+| 2 — low torque        | 0.795–0.803 | 0.780–0.782 |
+
+Below 6100 rpm slot 3 is unchanged to **0.00000**, so R23's own test band is
+untouched.
+
+**3008 rpm is deliberately excluded.** WOT there runs 1382 mg/stk on the
+aggressive curve and 1200 on the low-torque map, both at or above the 1200.01
+row, so the 1100.01 row is never reached under load — and it holds 1.000, so
+enriching it to 0.930 would be a large enrichment of a genuinely part-load cell
+that nothing has asked for.
+
+**The pump is not the constraint here**, which makes this the one enrichment in
+the lineage that is not pump-limited: `HPFP Eff Vol` runs a median 75.6 % at
+5500-6000 rpm and 69.3 % at 6000-6600.
+
+**Slot 1 is not held on that row.** Holding it at R22's lambda would need
+offsets of +0.050 and +0.030 at 5504 and 5984 rpm, and under the *wrong* sign
+convention those deliver 0.7305 and 0.7510 lambda — past the 0.755 rich bound,
+beyond which the pump cannot hold rail pressure and extra enrichment stops
+arriving. `slot_lambda_map`'s both-signs guard refuses them. That is the guard
+working, not an oversight, so slot 1 takes the top-end enrichment at 1100 mg/stk
+with every other slot — the safe direction on the bad-tank map.
+`_check_row5_hold_refused` asserts the refusal at build time, so if a future
+revision changes the bound or the grid such that the hold becomes safe, the
+build fails and forces this reasoning to be revisited rather than letting it
+quietly become false.
+
+### The retired invariant — the thing to review hardest
+
+Every revision since R14 carried this: **slot 1 sits at or below every other slot
+at every breakpoint.** The new slot 2 breaks it. It is far below slot 1 through
+the mid-range (17.2 vs 20.7 psi at 4400 rpm) and above it from ~6000 rpm (19.3
+vs 18.2), because it is a different *shape* rather than a scaled copy, and no
+single ordering survives that.
+
+The invariant is retired deliberately and in the open, and replaced by three
+that carry the safety it was standing in for. All three are asserted in
+`_check_slot_ladder` before anything is written:
+
+1. **slot 1 stays at or below slots 3, 4 and 5 at every breakpoint** — the
+   bad-tank map is still never above a performance map;
+2. **slot 2 stays at or below slot 3 at every breakpoint** — the low-torque map
+   is bounded everywhere by the curve with 55 logged pulls behind it;
+3. **slot 2's highest cap anywhere stays below slot 1's** (2345 vs 2503 hPa,
+   19.32 vs 21.61 psi) — so it is still the lowest-demand map in the ladder
+   measured by peak, which is the number that sets peak cylinder pressure.
+
+### What moves
+
+Five tables, 222 bytes, raw-diff audit against `Patched_259L_R23.bin` clean with
+**unexplained = 0**: map slot 2's `PUT setpoint` — map slot boost cap, map slot
+2's `Lambda modifier` — map slot lambda offset, and the three basic lambda
+setpoint grids (`IP_LAMB_BAS[1]`, `IP_LAMB_BAS_HPDI[1]`, `IP_LAMB_BAS_MPI[1]`),
+in which **only row 5 moves, in four columns**. Slots 1, 3, 4 and 5 keep their
+boost caps, read off the R23 bin and written back. The base ignition maps, the
+knock fast-loop tables, the wastegate feedforward, the Spark IAT family, the
+limiters and every `Spark modifier` grid are R23's exactly, and so is everything
+R23 wrote on the 1200.01 and 1389.00 lambda rows — the change-summary plot draws
+all of them overplotted, because an unchanged table produces no `compare/` PNG.
+
+### R23 has not been flashed, and that costs nothing here
+
+The car still holds R22. Below ~6100 rpm R24 leaves slot 3 completely alone
+(max |ΔΛ| = 0.00000), so **a slot 3 pull on an R24 bin is still a clean test of
+R23's 3008 rpm enrichment and its +0.750 °CRK at 3500/4000 rpm**, and a slot 2
+pull is a test of R24. Above ~6100 rpm the two are the *same* intervention — R24
+is what makes R23's 0.780 actually arrive — so that band tests the pair together
+rather than either alone, which is the honest reading and not a confound worth
+avoiding.
+
+### The logging gate
+
+Flash on **plain 92**. Slot 2 wants a 3rd-gear pull from below 3000 rpm to
+redline, logging `Airmass`, `PUT`, `PUT SP` and rpm.
+
+* **The claim to falsify: airmass holds flat at 1200 mg/stk from ~3400 to ~6100
+  rpm.** If it sags in the middle, the VE measurement is wrong — most likely
+  because VE was taken at ~1500 mg/stk filling and does not transfer to 1200.
+  If it overshoots, the cap is not binding where it was assumed to.
+* Below ~3400 rpm the cap was not binding before and the turbo is still
+  spooling, so nothing is predicted there and nothing should be read into it.
+* A rise in knock at 5750–6250 rpm would be the one genuine surprise: slot 2 now
+  runs slot 3's boost there on slot 3's fuelling but on **base** timing, which
+  is strictly gentler than slot 3, so it should knock less rather than more.
+* **Also readable on any slot: `Lambda SP` at 6250–6600 rpm should now be 0.780,
+  not 0.79–0.80.** That is the top-end fix arriving, and it is the cheapest
+  thing in this revision to confirm.
+* Slot 3 is unchanged from R23 and is still the everyday map and the in-drive
+  fallback. Slots 4 and 5 still need the VP Octanium dose.
+
+Verify with `Code/.venv/bin/python Logs/aggressive_slot_lineage/size_r24_linear.py`
+(reproduces every number above) and
+`Code/.venv/bin/python Tunes/MainTune/plot_r24_changes.py`
+(`MainTune_out/R24_changes_summary.png`, read off both bins).

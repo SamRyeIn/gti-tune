@@ -10,14 +10,29 @@ This file now lives at the `Tunes/` root and spans both project folders: it
 tracked `TuningBasicsGuide` (R00–R15) alone until R15, and continues into
 `MainTune` (R16 onward) — see `REV_LOG.md` for the project split.
 
-Current lineage tip: **R23 — built and verified 2026-09-03, awaiting human
-review and a flash.** It is the first revision aimed at making the everyday
-pump-92 map better rather than at running an experiment beside it: the lambda
-grid is enriched at 3008 rpm and 5504-7008 rpm as far as the fuel pump allows,
-slot 3 gains +0.750 °CRK at 3500 and 4000 rpm, and slots 1 and 2 are held at
-their prior lambda through the lineage's first use of the per-slot `Lambda
-modifier` — map slot lambda offset grids. **Boost is unchanged.** Six tables
-move, 68 bytes. Full rationale and the logging gate: `REV_LOG.md` § R23.
+Current lineage tip: **R24 — built and verified 2026-09-03, awaiting human
+review and a flash.** It rebuilds **map slot 2 as the low-torque map**: the
+first slot in this lineage shaped for a *powerband* rather than for a boost
+number. Power goes as airmass × rpm, so a powerband linear in rpm is exactly a
+constant airmass — the whole calibration is one number, a flat **1200 mg/stk**,
+plus the measured volumetric efficiency that turns it into a cap. Peak power
+moves **5500 → 6250 rpm** for −2.6 %, mid-range torque comes down **22 %**, and
+power against rpm fits a straight line at R² 0.998. Slot 2 also leaves R23's
+lambda hold. **The ladder stops being monotonic in boost** and the "slot 1 is
+lowest everywhere" invariant carried since R14 is retired, replaced by three
+narrower ones. It also **finishes R23's top-end enrichment**, which was fading
+out over the last 400 rpm of the rev range on every slot — see below. Five
+tables move, 222 bytes. Full rationale and the logging gate: `REV_LOG.md` § R24.
+
+Its parent **R23 — built and verified 2026-09-03, also unflashed** — enriches
+the lambda grid at 3008 rpm and 5504-7008 rpm as far as the fuel pump allows,
+gives slot 3 +0.750 °CRK at 3500 and 4000 rpm, and holds slots 1 and 2 at their
+prior lambda through the lineage's first use of the per-slot `Lambda modifier`
+— map slot lambda offset grids. Boost unchanged; six tables, 68 bytes.
+**R24 supersedes it as the thing to flash.** Below ~6100 rpm R24 leaves slot 3
+completely alone, so a slot 3 pull on an R24 bin is still a clean test of R23's
+3008 rpm enrichment and its +0.750 °CRK at 3500/4000 rpm. Above ~6100 rpm the
+two are the same intervention — R24 is what makes R23's 0.780 actually arrive.
 
 Its predecessor **R22 was flashed, logged and reviewed on 2026-09-01; the
 three-slot octane experiment came back null** (`Logs/BasicsGuide_R22/log_review.md`).
@@ -64,7 +79,7 @@ not supported (rank correlation of knock area with time +0.008).
 - The richer-lambda item below is **partly spent**: R23 enriches 3000-3500 rpm
   and 5504-7008 rpm, but the fuel pump caps the first at lambda 0.930 rather
   than EQT's 0.870. The rest of that gap is the boost proposal immediately
-  below, which is the live R24 item.
+  below, which is now the live R25 item.
 - The per-slot route it described is **built**: `simoscal` now binds the five
   `Lambda modifier` — map slot lambda offset grids as `slot{N}_lambda_modifier`
   and writes them through `tune.switchpatch.slot_lambda_map()`. R23 uses it to
@@ -75,7 +90,35 @@ not supported (rank correlation of knock area with time +0.008).
   their sitting in different rpm bands to stay attributable, which is recorded
   as an accepted confound rather than hidden.
 
-**Queued for R24:**
+**R24 is built, and it spent none of the queue below.** Sam asked for a
+low-torque map with a linear powerband peaking near 6000 rpm, which is a
+different axis of work from the knock-and-fuelling thread these items sit on.
+Two things it changes for them:
+
+- The `Lambda modifier` **sign test now rests on slot 1 alone.** R24 released
+  slot 2 to the enrichment, because its clamped cap makes it run slot 3's boost
+  above ~6150 rpm and R23's hold would have left it lean exactly there. Slot 1
+  still carries the positive offset, so the test in `REV_LOG.md` § R23 still
+  works — read `Lambda SP` on slot 1 against slot 3 at 3000-3500 rpm loaded WOT.
+- **One item below is now spent, and it was a bug in R23 rather than a queued
+  idea.** R23's 5504-7008 rpm enrichment to lambda 0.780 was written on the
+  1200.01 and 1389.00 mg/stk rows only, but WOT filling falls to 1176 mg/stk at
+  6250 rpm and 1089 at 6500 — below the 1200.01 breakpoint — so the lookup
+  dropped onto the 1100.01 row R22 left at 0.810/0.800 and the command came out
+  **0.786 and 0.801, not 0.780**, on every slot. Found while checking whether
+  slots 2 and 3 run the same lambda. R24 writes 0.780 onto the 1100.01 row in
+  the same four columns; commanded lambda above 6100 rpm goes from 0.780-0.801
+  to 0.780-0.782 on slot 3. **Worth carrying as a general lesson: an enrichment
+  written on the loaded rows only will fade wherever filling falls off those
+  rows, and the top of the rev range is exactly where it does.**
+- **A new open question, cheap to answer:** does the flat-airmass prediction
+  hold? R24's cap is `1200 / VE(rpm)`, and VE was measured at ~1500 mg/stk
+  filling on the aggressive curve. If it does not transfer down to 1200, slot 2's
+  airmass will sag in the middle rather than run flat. One slot-2 3rd-gear pull
+  settles it, and the answer also tells us how much to trust the same VE
+  inversion in the boost trade immediately below.
+
+**Queued for R25:**
 
 - **Trade ~1.3 psi of low-end boost for EQT's fuelling in the knock band.**
   *This is the proposal R23 flagged and did not build.* The 3000-3500 rpm band
