@@ -952,6 +952,74 @@ be verified.
   compressor limiting, and P0234 margin. R12 retains slot 3's former 26 psi
   target and adds no fuel-system or compressor headroom.
 
+## Queued, unnumbered — the DSG shift fart
+
+A separate axis of work from the knock-and-fuelling thread above, opened by Sam
+on 2026-09-07. **Characterization is done and nothing has been changed**; the
+whole picture is in `knowledge/dsg-shift-fart-calibration.md`, measured over 141
+intervened upshifts in 89 logs and read off the flashed bin rather than typed
+from a guide. Sam's call: when it is built it gets **its own revision**, so the
+change is unambiguous in the next set of logs — the number is decided at build
+time, since the R25 slot above is already claimed by the boost/fuel trade.
+
+What the characterization established, so it is not re-derived:
+
+- **The retard is already there; the fuel is what is missing.** On a WOT upshift
+  59 of 79 logged interventions cut the fuel outright (lambda off the top of the
+  logged range), so the exhaust gets air. On a part-throttle upshift the fuel
+  keeps flowing while the ignition goes to −35.6 °CRK. The car is quiet where
+  noise is wanted and noisy where it is not.
+- **The lever is `ID_EFF_SCC_SP_MIN`** — Minimum efficiency setpoint for single
+  cylinder shut-off in case of gear shift, on the DCT row (`TRANS_TYP` = 4,
+  which the Funktionsrahmen states outright). It is a *minimum*, so a **higher**
+  number cuts **fewer** cylinders: 0.00 today permits a full four-cylinder cut
+  in D, 0.55 would clamp it to one. Adding retard to
+  `IP_IGA_ADD_MIN_GS_REQ` — Correction map for IGA_MIN_BAS_TMP in case of
+  external request instead re-times cylinders that have no fuel in them.
+- **All five tables are base calibration, shared by every map slot**, and are
+  byte-identical to stock across all 94 bins this lineage has produced. So this
+  cannot be put on one slot and tested against another the way the boost and
+  lambda work has been — the usual within-session control is not available.
+- **The cost is mechanical, not thermal-only.** The cut exists to reduce torque
+  for the shift; cutting fewer cylinders puts more torque through the DQ250's
+  clutch packs. Shift quality and clutch wear are the price, and neither shows
+  up in the exhaust note. The downpipe is catted aftermarket, so cat and
+  exhaust temperatures want watching on the first drive too.
+
+Open before building:
+
+- **Run the lever-vs-button test before anything else** — one drive, and it
+  settles two open questions. Sam's point (2026-09-07) that the *gear lever* is
+  what changes DSG shift logic while the *Sport button* changes throttle and
+  steering is matched by the ECU's own structure: FR § DRPD builds a gear-lever
+  sport flag `LV_DRIV_MOD_SEL_GLV_SPT` = (`SEL_PSN_MSK` AND
+  `CLF_DRIV_MOD_SEL_PSN_MSK_SPT`) separately from the drive-mode switch request,
+  and coordinates the two into `LF_DRIV_MOD`.
+  The two retard maps diverge by **8–12 °CRK at 3520–4512 rpm and 600–1350
+  mg/stk** — a firm part-throttle upshift, ~40–60 % pedal — and are identical
+  below 400 mg/stk. Log a few upshifts in that window three times: lever **D**,
+  lever **S**, and the **Sport profile** selected. `Ign Avg` at the shift reads
+  out which map was live; the fuel-flow drop says whether the cut differed.
+  Existing logs hold 12 events in that zone across R11–R22 and they are one
+  tight cluster (−16.9 to −22.9 °CRK) with no 8–10 °CRK split — consistent with
+  a single map running throughout, but silent on which.
+- **Record the lever position and the drive mode in every session from now on.**
+  Neither is a logged channel and both change which table runs. It costs a note.
+- Two things stay unresolved and neither can be settled from the bin, because
+  the constants are **not defined in either XDF for this box code**:
+  (a) whether the lever alone sets bit 3 of `LF_DRIV_MOD` and so selects the
+  Sport retard map — that runs through `CLF_DRIV_MOD_SEL_PSN_MSK_SPT`; and
+  (b) a second, genuinely lever-gated sport path sitting *upstream of the cut* —
+  FR § 72.8.3.3 selects `IP_TQI_THD_DYN_SCC_GS_DEC_SPT` over
+  `IP_TQI_THD_DYN_SCC_GS_DEC`, the torque threshold that authorizes the dynamic
+  fuel cut at a shift, on a condition whose middle term is
+  (`SEL_PSN_MSK` AND `CLF_SEL_PSN_SCC_GS_PRMS_SPT`).
+  What the sport-SCC conclusion above does **not** depend on any of this:
+  `CLF_EFF_SCC_SP_DRIV_MOD` = 0 is a mask with no bits set, so no drive-mode
+  value can match it however sport is requested.
+- Nothing here measures sound. Decide how a change gets scored — by ear, or with
+  a phone recording taken on the same stretch of road before and after.
+
 ## Future revision-script hardening
 
 The R11 flash-guidance and checksum-report fixes are currently local to
